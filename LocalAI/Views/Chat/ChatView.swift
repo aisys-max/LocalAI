@@ -44,7 +44,7 @@ struct ChatView: View {
                         }
                         if model.generating {
                             HStack {
-                                TypingIndicatorView(model: model, theme: theme)
+                                TypingIndicatorView(theme: theme)
                                     .padding(.horizontal, 15)
                                     .padding(.vertical, 11)
                                     .background(RoundedRectangle(cornerRadius: 20).fill(theme.surface))

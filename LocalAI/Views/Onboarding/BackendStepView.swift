@@ -6,17 +6,12 @@ struct BackendStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(model.strings.choosePlatformTitle)
-                .font(AppFont.heading(26))
-                .foregroundColor(theme.text)
-                .padding(.top, 20)
-                .padding(.bottom, 8)
-
-            Text(model.strings.choosePlatformBody)
-                .font(AppFont.body(14))
-                .foregroundColor(theme.textMuted)
-                .lineSpacing(3)
-                .padding(.bottom, 20)
+            StepHeaderView(
+                title: model.strings.choosePlatformTitle,
+                subtitle: model.strings.choosePlatformBody,
+                theme: theme,
+                bottomPadding: 20
+            )
 
             VStack(spacing: 12) {
                 ForEach(Backend.allCases) { backend in

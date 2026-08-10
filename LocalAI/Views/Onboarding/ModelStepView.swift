@@ -6,17 +6,12 @@ struct ModelStepView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(model.strings.chooseModelTitle)
-                .font(AppFont.heading(26))
-                .foregroundColor(theme.text)
-                .padding(.top, 20)
-                .padding(.bottom, 8)
-
-            Text(model.strings.chooseModelBody)
-                .font(AppFont.body(14))
-                .foregroundColor(theme.textMuted)
-                .lineSpacing(3)
-                .padding(.bottom, 16)
+            StepHeaderView(
+                title: model.strings.chooseModelTitle,
+                subtitle: model.strings.chooseModelBody,
+                theme: theme,
+                bottomPadding: 16
+            )
 
             SegmentedPillControl(
                 items: Backend.allCases, label: { $0.label },
