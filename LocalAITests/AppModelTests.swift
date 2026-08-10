@@ -21,6 +21,21 @@ import Testing
         #expect(model.chats[chatId]?.messages.last?.text == "hello there")
     }
 
+    @Test func sendMessageAssemblesReplyFromStreamedChunks() async {
+        let model = AppModel(backendClient: FakeChatBackendClient(chunks: ["hel", "lo ", "there"]))
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.draft = "hi"
+        model.sendMessage()
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        #expect(model.generating == false)
+        #expect(model.chats[chatId]?.messages.last?.text == "hello there")
+        #expect(model.chats[chatId]?.messages.last?.role == .assistant)
+    }
+
     @Test func firstUserMessageSetsChatTitle() async {
         let model = AppModel(backendClient: FakeChatBackendClient())
         model.newChat()

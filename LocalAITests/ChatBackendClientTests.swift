@@ -2,16 +2,23 @@ import Testing
 @testable import LocalAI
 
 @Suite struct ChatBackendClientTests {
-    @Test func generateReplyReturnsACannedReply() async {
+    @Test func generateReplyStreamsASingleCannedReplyChunk() async throws {
         let client = SimulatedChatBackendClient()
-        let reply = await client.generateReply(chatId: "c1", model: "Llama 3.1 8B", delayNanoseconds: 0)
-        #expect(CannedReplies.all.contains(reply))
+        var chunks: [String] = []
+        for try await chunk in client.generateReply(chatId: "c1", model: "Llama 3.1 8B", delayNanoseconds: 0) {
+            chunks.append(chunk)
+        }
+        #expect(chunks.count == 1)
+        #expect(CannedReplies.all.contains(chunks[0]))
     }
 
-    @Test func generateReplyIsNeverEmptyAcrossRepeatedCalls() async {
+    @Test func generateReplyIsNeverEmptyAcrossRepeatedCalls() async throws {
         let client = SimulatedChatBackendClient()
         for _ in 0..<20 {
-            let reply = await client.generateReply(chatId: "c1", model: "Llama 3.1 8B", delayNanoseconds: 0)
+            var reply = ""
+            for try await chunk in client.generateReply(chatId: "c1", model: "Llama 3.1 8B", delayNanoseconds: 0) {
+                reply += chunk
+            }
             #expect(!reply.isEmpty)
         }
     }

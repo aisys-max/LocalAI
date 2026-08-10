@@ -1,16 +1,22 @@
 import Foundation
 
-/// Generates chat replies. `SimulatedChatBackendClient` is the current stand-in
-/// for a real Ollama/LM Studio client — swap the implementation passed into
-/// `AppModel.init(backendClient:)` when a real backend is wired up.
+/// Generates chat replies as a stream of text chunks. `SimulatedChatBackendClient`
+/// is the current stand-in for a real Ollama/LM Studio client — swap the
+/// implementation passed into `AppModel.init(backendClient:)` when a real
+/// backend is wired up.
 protocol ChatBackendClient {
-    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) async -> String
+    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error>
 }
 
 struct SimulatedChatBackendClient: ChatBackendClient {
-    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) async -> String {
-        try? await Task.sleep(nanoseconds: delayNanoseconds)
-        return CannedReplies.random()
+    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                try? await Task.sleep(nanoseconds: delayNanoseconds)
+                continuation.yield(CannedReplies.random())
+                continuation.finish()
+            }
+        }
     }
 }
 

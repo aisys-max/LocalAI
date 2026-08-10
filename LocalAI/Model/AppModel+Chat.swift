@@ -33,18 +33,7 @@ extension AppModel {
         draft = ""
         generating = true
 
-        Task {
-            let reply = await backendClient.generateReply(chatId: chatId, model: model, delayNanoseconds: 1_100_000_000)
-            await MainActor.run { self.finishReply(chatId: chatId, text: reply) }
-        }
-    }
-
-    func finishReply(chatId: String, text: String) {
-        guard var chat = chats[chatId] else { generating = false; return }
-        chat.messages.append(ChatMessage(id: "m\(Int(Date().timeIntervalSince1970 * 1000))", role: .assistant, text: text, model: model))
-        chat.snippet = String(text.prefix(60))
-        chats[chatId] = chat
-        generating = false
+        streamReply(chatId: chatId, delayNanoseconds: 1_100_000_000)
     }
 
     func regenerate(chatId: String, messageId: String) {
@@ -53,10 +42,45 @@ extension AppModel {
         chats[chatId] = chat
         generating = true
 
+        streamReply(chatId: chatId, delayNanoseconds: 900_000_000)
+    }
+
+    /// Streams an assistant reply into a new `ChatMessage`, appending it on the
+    /// first chunk and growing its text as further chunks arrive.
+    private func streamReply(chatId: String, delayNanoseconds: UInt64) {
+        let assistantId = UUID().uuidString
         Task {
-            let reply = await backendClient.generateReply(chatId: chatId, model: model, delayNanoseconds: 900_000_000)
-            await MainActor.run { self.finishReply(chatId: chatId, text: reply) }
+            var started = false
+            do {
+                for try await chunk in backendClient.generateReply(chatId: chatId, model: model, delayNanoseconds: delayNanoseconds) {
+                    await MainActor.run {
+                        if started {
+                            self.appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
+                        } else {
+                            self.beginReply(chatId: chatId, messageId: assistantId, chunk: chunk)
+                            started = true
+                        }
+                    }
+                }
+            } catch {
+                // Surfacing generation failures to the user is handled separately.
+            }
+            await MainActor.run { self.generating = false }
         }
+    }
+
+    private func beginReply(chatId: String, messageId: String, chunk: String) {
+        guard var chat = chats[chatId] else { return }
+        chat.messages.append(ChatMessage(id: messageId, role: .assistant, text: chunk, model: model))
+        chat.snippet = String(chunk.prefix(60))
+        chats[chatId] = chat
+    }
+
+    private func appendReplyChunk(chatId: String, messageId: String, chunk: String) {
+        guard var chat = chats[chatId], let index = chat.messages.firstIndex(where: { $0.id == messageId }) else { return }
+        chat.messages[index].text += chunk
+        chat.snippet = String(chat.messages[index].text.prefix(60))
+        chats[chatId] = chat
     }
 
     func copyMessage(id: String, text: String) {
