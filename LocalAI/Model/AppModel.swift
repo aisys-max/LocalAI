@@ -69,8 +69,7 @@ final class AppModel: ObservableObject {
         self.modelCatalogClient = modelCatalogClient
         self.modelFetchTimeoutNanoseconds = modelFetchTimeoutNanoseconds
         self.modelRetryBackoffNanoseconds = modelRetryBackoffNanoseconds
-        let seeded = SeedChats.make()
-        self.chats = Dictionary(uniqueKeysWithValues: seeded.map { ($0.id, $0) })
+        self.chats = [:]
         loadModels()
     }
 
