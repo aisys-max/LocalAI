@@ -19,7 +19,6 @@ LocalAI/                  # app target source root
     AppModel+Chat.swift
     ChatBackendClient.swift  # ChatBackendClient protocol + SimulatedChatBackendClient (canned replies) — the seam a real Ollama/LM Studio client slots into
     Chat.swift               # Chat / ChatMessage / MessageBlock / InlinePart — pure data, no logic
-    Fixtures.swift            # SeedChats — seed/fixture data for initial chat history
     Backend.swift             # Backend enum (ollama/lmstudio) + per-backend model lists
     Localization.swift        # AppLanguage enum + en/ko string + legal-text tables
   Views/                   # one subfolder per screen, mirroring the design's screen states
