@@ -74,6 +74,10 @@ struct Strings {
     let modelLoadTimeout: String
     let configureInSettingsHint: String
     let retryingAutomatically: String
+    let replyErrorUnreachable: String
+    let replyErrorTimeout: String
+    let replyErrorModelNotFound: String
+    let replyErrorGeneric: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
@@ -100,7 +104,11 @@ struct Strings {
         noModelSelected: "Select a model",
         modelLoadTimeout: "Couldn't load models within 30 seconds.",
         configureInSettingsHint: "You can set this up later in Settings.",
-        retryingAutomatically: "Retrying automatically…"
+        retryingAutomatically: "Retrying automatically…",
+        replyErrorUnreachable: "Couldn't reach the server. Check that it's running and try again.",
+        replyErrorTimeout: "The request timed out. Check your connection and try again.",
+        replyErrorModelNotFound: "This model isn't available on the server. Pick a different one in Settings.",
+        replyErrorGeneric: "Something went wrong generating a reply. Please try again."
     )
 
     static let ko = Strings(
@@ -128,8 +136,21 @@ struct Strings {
         noModelSelected: "모델을 선택하세요",
         modelLoadTimeout: "30초 안에 모델 목록을 가져오지 못했습니다.",
         configureInSettingsHint: "나중에 Settings에서 다시 설정할 수 있습니다.",
-        retryingAutomatically: "자동으로 다시 시도하는 중…"
+        retryingAutomatically: "자동으로 다시 시도하는 중…",
+        replyErrorUnreachable: "서버에 연결할 수 없습니다. 서버가 실행 중인지 확인 후 다시 시도하세요.",
+        replyErrorTimeout: "요청 시간이 초과되었습니다. 연결 상태를 확인한 후 다시 시도하세요.",
+        replyErrorModelNotFound: "이 서버에서 해당 모델을 찾을 수 없습니다. Settings에서 다른 모델을 선택하세요.",
+        replyErrorGeneric: "응답을 생성하는 중 문제가 발생했습니다. 다시 시도해주세요."
     )
+
+    func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {
+        switch kind {
+        case .unreachable: return replyErrorUnreachable
+        case .timeout: return replyErrorTimeout
+        case .modelNotFound: return replyErrorModelNotFound
+        case .other: return replyErrorGeneric
+        }
+    }
 
     func greeting(backendLabel: String, model: String?, language: AppLanguage) -> String {
         let modelLabel = model ?? (language == .en ? "a model you'll pick" : "선택할 모델")

@@ -4,13 +4,20 @@ import Foundation
 struct FakeChatBackendClient: ChatBackendClient {
     var reply: String = "fake reply"
     var chunks: [String]?
+    /// When set, the stream yields any given `chunks` (simulating a
+    /// partway failure) or none at all (an up-front failure), then fails.
+    var error: Error?
 
     func generateReply(chatId: String, model: String, messages: [ChatMessage], baseURL: URL, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            for chunk in chunks ?? [reply] {
+            for chunk in chunks ?? (error == nil ? [reply] : []) {
                 continuation.yield(chunk)
             }
-            continuation.finish()
+            if let error {
+                continuation.finish(throwing: error)
+            } else {
+                continuation.finish()
+            }
         }
     }
 }
