@@ -20,6 +20,11 @@ extension AppModel {
         screen = .chat
     }
 
+    func deleteChat(_ id: String) {
+        chats.removeValue(forKey: id)
+        if currentChatId == id { currentChatId = nil }
+    }
+
     func sendMessage() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !generating, let chatId = currentChatId, var chat = chats[chatId] else { return }
@@ -117,5 +122,19 @@ extension AppModel {
             guard !dayChats.isEmpty else { return nil }
             return (day, labels[day]!, dayChats.sorted { $0.id > $1.id })
         }
+    }
+}
+
+extension Chat {
+    /// The first exchange in the chat — the User's first message (if they've
+    /// sent one yet) and the Assistant reply that answered it, skipping the
+    /// opening greeting — used for the History preview card.
+    var previewExchange: (user: ChatMessage?, assistant: ChatMessage?) {
+        guard let userIndex = messages.firstIndex(where: { $0.role == .user }) else {
+            return (nil, messages.first(where: { $0.role == .assistant }))
+        }
+        let user = messages[userIndex]
+        let assistant = messages[(userIndex + 1)...].first(where: { $0.role == .assistant })
+        return (user, assistant)
     }
 }

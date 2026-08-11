@@ -74,6 +74,7 @@ struct Strings {
     let modelLoadTimeout: String
     let configureInSettingsHint: String
     let retryingAutomatically: String
+    let delete: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
@@ -100,7 +101,8 @@ struct Strings {
         noModelSelected: "Select a model",
         modelLoadTimeout: "Couldn't load models within 30 seconds.",
         configureInSettingsHint: "You can set this up later in Settings.",
-        retryingAutomatically: "Retrying automatically…"
+        retryingAutomatically: "Retrying automatically…",
+        delete: "Delete"
     )
 
     static let ko = Strings(
@@ -128,7 +130,8 @@ struct Strings {
         noModelSelected: "모델을 선택하세요",
         modelLoadTimeout: "30초 안에 모델 목록을 가져오지 못했습니다.",
         configureInSettingsHint: "나중에 Settings에서 다시 설정할 수 있습니다.",
-        retryingAutomatically: "자동으로 다시 시도하는 중…"
+        retryingAutomatically: "자동으로 다시 시도하는 중…",
+        delete: "삭제"
     )
 
     func greeting(backendLabel: String, model: String?, language: AppLanguage) -> String {

@@ -98,6 +98,85 @@ import Foundation
         model.copyMessage(id: "m1", text: "some text")
         #expect(model.copiedId == "m1")
     }
+
+    @Test func deleteChatRemovesItFromChats() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.deleteChat(chatId)
+
+        #expect(model.chats[chatId] == nil)
+    }
+
+    @Test func deleteChatClearsCurrentChatIdWhenDeletingTheOpenChat() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.deleteChat(chatId)
+
+        #expect(model.currentChatId == nil)
+    }
+
+    @Test func deleteChatLeavesCurrentChatIdUntouchedWhenDeletingADifferentChat() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let openChatId = model.currentChatId!
+        // A second chat with a distinct id — newChat() derives ids from a
+        // millisecond timestamp, so building this one by hand avoids a
+        // same-millisecond collision with openChatId in a fast test run.
+        let otherChatId = "other-chat"
+        model.chats[otherChatId] = model.chats[openChatId]
+
+        model.deleteChat(otherChatId)
+
+        #expect(model.currentChatId == openChatId)
+        #expect(model.chats[otherChatId] == nil)
+    }
+
+    @Test func previewExchangeBeforeAnyUserMessageIsJustTheGreeting() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chat = model.chats[model.currentChatId!]!
+
+        let preview = chat.previewExchange
+        #expect(preview.user == nil)
+        #expect(preview.assistant?.isGreeting == true)
+    }
+
+    @Test func previewExchangeAfterSendingSkipsTheGreetingAndUsesTheFirstReply() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "first reply"))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.draft = "first question"
+        model.sendMessage()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        model.draft = "second question"
+        model.sendMessage()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        let preview = model.chats[chatId]!.previewExchange
+        #expect(preview.user?.text == "first question")
+        #expect(preview.assistant?.text == "first reply")
+    }
+
+    @Test func previewExchangeWithAUserMessageButNoReplyYetOmitsTheAssistantSide() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chatId = model.currentChatId!
+        // No Model selected — sendMessage() posts the user message but never
+        // calls the backend, so there's no reply to preview yet.
+        model.draft = "unanswered question"
+        model.sendMessage()
+
+        let preview = model.chats[chatId]!.previewExchange
+        #expect(preview.user?.text == "unanswered question")
+        #expect(preview.assistant == nil)
+    }
 }
 
 @MainActor
