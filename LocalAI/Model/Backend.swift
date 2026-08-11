@@ -22,6 +22,13 @@ enum Backend: String, CaseIterable, Identifiable {
         }
     }
 
+    var defaultServerAddress: String {
+        switch self {
+        case .ollama: return "http://localhost:11434"
+        case .lmstudio: return "http://localhost:1234"
+        }
+    }
+
     func description(_ language: AppLanguage) -> String {
         switch self {
         case .ollama: return language.strings.ollamaDesc

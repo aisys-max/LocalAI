@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import LocalAI
 
 @MainActor
@@ -134,6 +135,45 @@ import Testing
         #expect(model.appearance == .dark)
         model.setLanguage(.ko)
         #expect(model.language == .ko)
+    }
+
+    @Test func serverAddressDefaultsToEachBackendsStandardPort() {
+        let model = AppModel(backendClient: FakeChatBackendClient())
+        #expect(model.serverAddress(for: .ollama) == "http://localhost:11434")
+        #expect(model.serverAddress(for: .lmstudio) == Backend.lmstudio.defaultServerAddress)
+    }
+
+    @Test func setServerAddressIsStoredPerBackendIndependently() {
+        let model = AppModel(backendClient: FakeChatBackendClient())
+        model.setServerAddress("http://192.168.1.5:11434", for: .ollama)
+        model.setServerAddress("http://192.168.1.5:1234", for: .lmstudio)
+
+        #expect(model.serverAddress(for: .ollama) == "http://192.168.1.5:11434")
+        #expect(model.serverAddress(for: .lmstudio) == "http://192.168.1.5:1234")
+    }
+
+    @Test func switchingBackendDoesNotClobberTheOtherBackendsCustomAddress() {
+        let model = AppModel(backendClient: FakeChatBackendClient())
+        model.setServerAddress("http://custom-ollama:11434", for: .ollama)
+
+        model.selectBackend(.lmstudio)
+        model.setServerAddress("http://custom-lmstudio:1234", for: .lmstudio)
+        model.selectBackend(.ollama)
+
+        #expect(model.serverAddress(for: .ollama) == "http://custom-ollama:11434")
+        #expect(model.serverAddress(for: .lmstudio) == "http://custom-lmstudio:1234")
+    }
+
+    @Test func currentServerURLFallsBackToTheBackendsDefaultWhenTheStoredAddressIsInvalid() {
+        let model = AppModel(backendClient: FakeChatBackendClient())
+        model.setServerAddress("not a url", for: .ollama)
+        #expect(model.currentServerURL == URL(string: Backend.ollama.defaultServerAddress)!)
+    }
+
+    @Test func currentServerURLReflectsAValidCustomAddress() {
+        let model = AppModel(backendClient: FakeChatBackendClient())
+        model.setServerAddress("http://192.168.1.5:11434", for: .ollama)
+        #expect(model.currentServerURL == URL(string: "http://192.168.1.5:11434")!)
     }
 }
 

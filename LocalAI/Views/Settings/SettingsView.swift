@@ -31,6 +31,20 @@ struct SettingsView: View {
                         }
                     }
 
+                    SectionLabel(model.strings.serverAddress, theme: theme)
+                    GroupCard(theme: theme) {
+                        TextField(model.backend.defaultServerAddress, text: serverAddressBinding)
+                            .font(AppFont.body(14.5))
+                            .foregroundColor(theme.text)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            #endif
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 13)
+                    }
+
                     SectionLabel(model.strings.sectionAppearance, theme: theme)
                     GroupCard(theme: theme) {
                         SegmentedPillControl(
@@ -83,6 +97,13 @@ struct SettingsView: View {
         .sheet(item: $model.legalOpenKey) { key in
             LegalSheetView(model: model, key: key, theme: theme)
         }
+    }
+
+    private var serverAddressBinding: Binding<String> {
+        Binding(
+            get: { model.serverAddress(for: model.backend) },
+            set: { model.setServerAddress($0, for: model.backend) }
+        )
     }
 
     private func legalLabel(_ key: LegalKey) -> String {

@@ -3,15 +3,17 @@ import Foundation
 @testable import LocalAI
 
 @Suite struct OpenAICompatibleChatBackendClientTests {
+    private let testBaseURL = URL(string: "http://localhost:11434")!
+
     @Test func requestHitsChatCompletionsEndpointWithModelAndMessages() async throws {
         StubURLProtocol.stub(status: 200, body: sseBody(["hi"]))
-        let client = OpenAICompatibleChatBackendClient(baseURL: OpenAICompatibleChatBackendClient.defaultBaseURL, session: stubbedSession())
+        let client = OpenAICompatibleChatBackendClient(session: stubbedSession())
 
         let messages = [
             ChatMessage(id: "1", role: .assistant, text: "hello!"),
             ChatMessage(id: "2", role: .user, text: "what's up"),
         ]
-        for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: messages, delayNanoseconds: 0) {}
+        for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: messages, baseURL: testBaseURL, delayNanoseconds: 0) {}
 
         let request = try #require(StubURLProtocol.capturedRequest)
         #expect(request.httpMethod == "POST")
@@ -25,12 +27,23 @@ import Foundation
         #expect(decoded.messages.map(\.content) == ["hello!", "what's up"])
     }
 
+    @Test func requestHitsTheConfiguredBaseURLNotAHardcodedOne() async throws {
+        StubURLProtocol.stub(status: 200, body: sseBody(["hi"]))
+        let client = OpenAICompatibleChatBackendClient(session: stubbedSession())
+        let customURL = URL(string: "http://192.168.1.5:1234")!
+
+        for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: [], baseURL: customURL, delayNanoseconds: 0) {}
+
+        let request = try #require(StubURLProtocol.capturedRequest)
+        #expect(request.url?.absoluteString == "http://192.168.1.5:1234/v1/chat/completions")
+    }
+
     @Test func streamedReplyYieldsEachDeltaChunkInOrder() async throws {
         StubURLProtocol.stub(status: 200, body: sseBody(["Hel", "lo ", "there"]))
-        let client = OpenAICompatibleChatBackendClient(baseURL: OpenAICompatibleChatBackendClient.defaultBaseURL, session: stubbedSession())
+        let client = OpenAICompatibleChatBackendClient(session: stubbedSession())
 
         var chunks: [String] = []
-        for try await chunk in client.generateReply(chatId: "c1", model: "llama3", messages: [], delayNanoseconds: 0) {
+        for try await chunk in client.generateReply(chatId: "c1", model: "llama3", messages: [], baseURL: testBaseURL, delayNanoseconds: 0) {
             chunks.append(chunk)
         }
 
@@ -39,10 +52,10 @@ import Foundation
 
     @Test func nonSuccessResponseThrows() async throws {
         StubURLProtocol.stub(status: 500, body: Data())
-        let client = OpenAICompatibleChatBackendClient(baseURL: OpenAICompatibleChatBackendClient.defaultBaseURL, session: stubbedSession())
+        let client = OpenAICompatibleChatBackendClient(session: stubbedSession())
 
         await #expect(throws: Error.self) {
-            for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: [], delayNanoseconds: 0) {}
+            for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: [], baseURL: testBaseURL, delayNanoseconds: 0) {}
         }
     }
 

@@ -53,7 +53,7 @@ extension AppModel {
         Task {
             var started = false
             do {
-                for try await chunk in backendClient.generateReply(chatId: chatId, model: model, messages: messages, delayNanoseconds: delayNanoseconds) {
+                for try await chunk in backendClient.generateReply(chatId: chatId, model: model, messages: messages, baseURL: currentServerURL, delayNanoseconds: delayNanoseconds) {
                     await MainActor.run {
                         if started {
                             self.appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
