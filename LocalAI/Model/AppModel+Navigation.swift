@@ -1,8 +1,6 @@
 import Foundation
 
 extension AppModel {
-    func goHistory() { screen = .history }
-
     func goSettings() {
         screen = .settings
         resumeModelRetryLoopIfNeeded()

@@ -8,9 +8,6 @@ struct ChatView: View {
         VStack(spacing: 0) {
             VStack(spacing: 8) {
                 HStack {
-                    IconButtonView(systemName: "clock.arrow.circlepath", theme: theme) {
-                        model.goHistory()
-                    }
                     Spacer()
                     Text(model.strings.appName)
                         .font(AppFont.heading(17))

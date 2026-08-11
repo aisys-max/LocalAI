@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Circular icon button — ports the design's `iconBtnStyle`, reused in every
-/// screen header (back chevron, history, settings, new-chat, ellipsis, etc).
+/// screen header (back chevron, settings, delete, new-chat, ellipsis, etc).
 struct IconButtonView: View {
     let systemName: String
     let theme: Theme

@@ -15,11 +15,6 @@ extension AppModel {
         screen = .chat
     }
 
-    func openChat(_ id: String) {
-        currentChatId = id
-        screen = .chat
-    }
-
     func deleteChat(_ id: String) {
         chats.removeValue(forKey: id)
         if currentChatId == id { currentChatId = nil }
@@ -112,21 +107,6 @@ extension AppModel {
         currentChatId.flatMap { chats[$0] }
     }
 
-    /// Chats grouped by day, ordered today → yesterday → previous7, each newest-first —
-    /// mirrors the design's `historyGroups`. Each chat's bucket is computed live from
-    /// `createdAt` (see `chatDayBucket`), so a chat correctly ages from Today to
-    /// Yesterday to Previous 7 Days as real time passes.
-    var historyGroups: [(day: ChatDay, label: String, chats: [Chat])] {
-        let now = Date()
-        let order: [ChatDay] = [.today, .yesterday, .previous7]
-        let labels: [ChatDay: String] = [.today: strings.today, .yesterday: strings.yesterday, .previous7: strings.previous7]
-        return order.compactMap { day in
-            let dayChats = chats.values.filter { chatDayBucket(for: $0.createdAt, now: now) == day }
-            guard !dayChats.isEmpty else { return nil }
-            return (day, labels[day]!, dayChats.sorted { $0.createdAt > $1.createdAt })
-        }
-    }
-
     func deleteChats(in range: ChatDeleteRange, now: Date = Date(), calendar: Calendar = .current) {
         let idsToDelete = chats.values
             .filter { isChat($0, in: range, now: now, calendar: calendar) }
@@ -158,9 +138,9 @@ extension AppModel {
     }
 }
 
-/// The bucket a chat's `createdAt` falls into for History's grouping —
-/// computed live at call time (not stored), so chats age correctly without
-/// any background job. `now`/`calendar` are injectable for deterministic tests.
+/// The bucket a chat's `createdAt` falls into for Settings' range-based bulk
+/// delete — computed live at call time (not stored). `now`/`calendar` are
+/// injectable for deterministic tests.
 func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> ChatDay {
     if calendar.isDate(date, inSameDayAs: now) { return .today }
     if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
@@ -173,18 +153,4 @@ func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .cur
 /// Today ⊆ Since Yesterday ⊆ This Week ⊆ This Month ⊆ All.
 enum ChatDeleteRange: CaseIterable {
     case today, sinceYesterday, thisWeek, thisMonth, all
-}
-
-extension Chat {
-    /// The first exchange in the chat — the User's first message (if they've
-    /// sent one yet) and the Assistant reply that answered it, skipping the
-    /// opening greeting — used for the History preview card.
-    var previewExchange: (user: ChatMessage?, assistant: ChatMessage?) {
-        guard let userIndex = messages.firstIndex(where: { $0.role == .user }) else {
-            return (nil, messages.first(where: { $0.role == .assistant }))
-        }
-        let user = messages[userIndex]
-        let assistant = messages[(userIndex + 1)...].first(where: { $0.role == .assistant })
-        return (user, assistant)
-    }
 }

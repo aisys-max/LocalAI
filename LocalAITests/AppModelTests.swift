@@ -83,16 +83,6 @@ import Foundation
         #expect(model.chats[chatId]?.messages.last?.text == "second reply")
     }
 
-    @Test func historyGroupsOrderTodayYesterdayPrevious7() {
-        let model = makeTestAppModel()
-        let groups = model.historyGroups
-        let days = groups.map(\.day)
-        #expect(days == days.sorted { a, b in
-            let order: [ChatDay: Int] = [.today: 0, .yesterday: 1, .previous7: 2]
-            return order[a]! < order[b]!
-        })
-    }
-
     @Test func copyMessageSetsCopiedId() {
         let model = makeTestAppModel()
         model.copyMessage(id: "m1", text: "some text")
@@ -135,49 +125,6 @@ import Foundation
         #expect(model.chats[otherChatId] == nil)
     }
 
-    @Test func previewExchangeBeforeAnyUserMessageIsJustTheGreeting() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let chat = model.chats[model.currentChatId!]!
-
-        let preview = chat.previewExchange
-        #expect(preview.user == nil)
-        #expect(preview.assistant?.isGreeting == true)
-    }
-
-    @Test func previewExchangeAfterSendingSkipsTheGreetingAndUsesTheFirstReply() async {
-        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "first reply"))
-        model.selectModel("test-model")
-        model.newChat()
-        let chatId = model.currentChatId!
-
-        model.draft = "first question"
-        model.sendMessage()
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        model.draft = "second question"
-        model.sendMessage()
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        let preview = model.chats[chatId]!.previewExchange
-        #expect(preview.user?.text == "first question")
-        #expect(preview.assistant?.text == "first reply")
-    }
-
-    @Test func previewExchangeWithAUserMessageButNoReplyYetOmitsTheAssistantSide() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let chatId = model.currentChatId!
-        // No Model selected — sendMessage() posts the user message but never
-        // calls the backend, so there's no reply to preview yet.
-        model.draft = "unanswered question"
-        model.sendMessage()
-
-        let preview = model.chats[chatId]!.previewExchange
-        #expect(preview.user?.text == "unanswered question")
-        #expect(preview.assistant == nil)
-    }
-
     @Test func newChatSetsCreatedAtToNow() {
         let model = makeTestAppModel()
         model.newChat()
@@ -185,7 +132,7 @@ import Foundation
         #expect(abs(chat.createdAt.timeIntervalSinceNow) < 1)
     }
 
-    // MARK: - chatDayBucket / historyGroups live bucketing
+    // MARK: - chatDayBucket
 
     @Test func chatDayBucketReturnsTodayForATimestampEarlierTheSameDay() {
         let now = DeleteRangeFixture.now
@@ -208,20 +155,6 @@ import Foundation
         // ...but becomes "yesterday" once `now` has moved to the next calendar day.
         let nextDay = DeleteRangeFixture.calendar.date(byAdding: .day, value: 1, to: DeleteRangeFixture.now)!
         #expect(chatDayBucket(for: lateInTheDay, now: nextDay, calendar: DeleteRangeFixture.calendar) == .yesterday)
-    }
-
-    @Test func historyGroupsBucketsLiveFromCreatedAtRatherThanAStaleStoredValue() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let recentId = model.currentChatId!
-        model.chats[recentId]!.createdAt = DeleteRangeFixture.now
-
-        let oldId = "old-chat"
-        model.chats[oldId] = DeleteRangeFixture.makeChat(id: oldId, createdAt: DeleteRangeFixture.lastMonth)
-
-        let groups = Dictionary(uniqueKeysWithValues: model.historyGroups.map { ($0.day, $0.chats.map(\.id)) })
-        #expect(groups[.previous7]?.contains(oldId) == true)
-        #expect(groups[.today]?.contains(oldId) != true)
     }
 
     // MARK: - deleteChats(in:)
@@ -378,10 +311,8 @@ private enum DeleteRangeFixture {
         }
     }
 
-    @Test func goHistorySettingsChatUpdateScreen() {
+    @Test func goSettingsChatUpdateScreen() {
         let model = makeTestAppModel()
-        model.goHistory()
-        #expect(model.screen == .history)
         model.goSettings()
         #expect(model.screen == .settings)
         model.goChat()

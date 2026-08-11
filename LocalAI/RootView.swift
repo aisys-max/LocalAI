@@ -10,7 +10,6 @@ struct RootView: View {
             switch model.screen {
             case .onboarding: OnboardingView(model: model)
             case .chat: ChatView(model: model)
-            case .history: HistoryView(model: model)
             case .settings: SettingsView(model: model)
             case .modelPicker: ModelPickerView(model: model)
             }

@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 enum Screen {
-    case onboarding, chat, history, settings, modelPicker
+    case onboarding, chat, settings, modelPicker
 }
 
 enum AppearanceMode: String, CaseIterable, Identifiable {

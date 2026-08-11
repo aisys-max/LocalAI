@@ -32,11 +32,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 struct Strings {
     let appName: String
     let newChat: String
-    let historyTitle: String
     let settingsTitle: String
-    let today: String
-    let yesterday: String
-    let previous7: String
     let sectionModel: String
     let serverAddress: String
     let sectionAppearance: String
@@ -90,8 +86,7 @@ struct Strings {
     let cancel: String
 
     static let en = Strings(
-        appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
-        today: "Today", yesterday: "Yesterday", previous7: "Previous 7 Days",
+        appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
         sectionModel: "Model", serverAddress: "Server Address",
         sectionAppearance: "Appearance", sectionLanguage: "Language", sectionAbout: "About",
         light: "Light", dark: "Dark", system: "System",
@@ -132,8 +127,7 @@ struct Strings {
     )
 
     static let ko = Strings(
-        appName: "Local AI", newChat: "새 대화", historyTitle: "기록", settingsTitle: "설정",
-        today: "오늘", yesterday: "어제", previous7: "지난 7일",
+        appName: "Local AI", newChat: "새 대화", settingsTitle: "설정",
         sectionModel: "모델", serverAddress: "서버 주소",
         sectionAppearance: "화면 모드", sectionLanguage: "언어", sectionAbout: "정보",
         light: "라이트", dark: "다크", system: "시스템",
