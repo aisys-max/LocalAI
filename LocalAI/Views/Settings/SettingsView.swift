@@ -23,11 +23,19 @@ struct SettingsView: View {
                         GroupRow(theme: theme, isFirst: false) {
                             model.openModelPicker(from: .settings)
                         } content: {
-                            Text(model.model)
+                            Text(model.model ?? model.strings.noModelSelected)
                                 .foregroundColor(theme.text)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(theme.textMuted)
+                        }
+
+                        if model.isRetryingModels {
+                            Text(model.strings.retryingAutomatically)
+                                .font(AppFont.body(12))
+                                .foregroundColor(theme.textMuted)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 13)
                         }
                     }
 

@@ -13,15 +13,6 @@ enum Backend: String, CaseIterable, Identifiable {
         }
     }
 
-    var models: [String] {
-        switch self {
-        case .ollama:
-            return ["Llama 3.1 8B", "Mistral 7B", "Gemma 2 9B", "Phi-3 Mini"]
-        case .lmstudio:
-            return ["Llama 3.1 8B Instruct (GGUF)", "Qwen2.5 7B Instruct", "Mistral 7B Instruct v0.3", "DeepSeek-Coder 6.7B"]
-        }
-    }
-
     var defaultServerAddress: String {
         switch self {
         case .ollama: return "http://localhost:11434"

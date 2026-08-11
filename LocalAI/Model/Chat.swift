@@ -31,6 +31,11 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     var text: String
     var model: String?
+    /// The synthetic "hi" message a new chat opens with — unlike a real
+    /// generated reply, it isn't tied to whatever Engine/Model produced it,
+    /// so it's re-rendered against the live Engine/Model instead of the
+    /// snapshot captured when the chat was created.
+    var isGreeting: Bool = false
 }
 
 struct Chat: Identifiable {

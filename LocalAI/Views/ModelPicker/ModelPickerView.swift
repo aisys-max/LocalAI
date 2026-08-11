@@ -25,13 +25,15 @@ struct ModelPickerView: View {
                         .padding(.vertical, 16)
                         .padding(.horizontal, 4)
 
-                    VStack(spacing: 10) {
-                        ForEach(model.backend.models, id: \.self) { m in
-                            ModelRow(name: m, selected: m == model.model, theme: theme) {
-                                model.selectModel(m)
-                            }
-                        }
-                    }
+                    ModelListContent(
+                        state: model.modelListState,
+                        selectedModel: model.model,
+                        theme: theme,
+                        strings: model.strings,
+                        onSelect: { model.selectModel($0) },
+                        onRetry: { model.startModelRetryLoop() },
+                        hint: model.isRetryingModels ? model.strings.retryingAutomatically : nil
+                    )
                     .padding(.bottom, 16)
 
                     Button {

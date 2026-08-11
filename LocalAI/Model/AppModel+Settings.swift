@@ -3,7 +3,16 @@ import Foundation
 extension AppModel {
     func selectBackend(_ b: Backend) {
         backend = b
-        model = b.models[0]
+        model = nil
+        // Route through the retry loop if one is active, rather than calling
+        // loadModels() directly — otherwise switching Backend mid-retry would
+        // cancel the loop's in-flight fetch, leaving it stuck on `.loading`
+        // and silently killing auto-retry for good.
+        if modelRetryLoopTask != nil {
+            startModelRetryLoop()
+        } else {
+            loadModels()
+        }
     }
     func selectModel(_ m: String) { model = m }
     func setAppearance(_ a: AppearanceMode) { appearance = a }
