@@ -29,6 +29,14 @@ struct SettingsView: View {
                             Image(systemName: "chevron.right")
                                 .foregroundColor(theme.textMuted)
                         }
+
+                        if model.isRetryingModels {
+                            Text(model.strings.retryingAutomatically)
+                                .font(AppFont.body(12))
+                                .foregroundColor(theme.textMuted)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 13)
+                        }
                     }
 
                     SectionLabel(model.strings.serverAddress, theme: theme)

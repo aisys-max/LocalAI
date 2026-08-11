@@ -17,9 +17,15 @@ struct SimulatedModelCatalogClient: ModelCatalogClient {
 }
 
 /// The state of a Backend's Model list fetch, driving the loading/error/list
-/// UI in `ModelStepView` and `ModelPickerView`.
+/// UI in `ModelStepView` and `ModelPickerView`. `.timedOut` is distinct from
+/// `.failed` (connection refused, bad response, ...) because the message
+/// shown to the user differs.
 enum ModelListState: Equatable {
     case loading
     case loaded([String])
     case failed
+    case timedOut
 }
+
+/// Thrown internally when a Model fetch exceeds `AppModel.modelFetchTimeoutNanoseconds`.
+struct ModelFetchTimeoutError: Error {}

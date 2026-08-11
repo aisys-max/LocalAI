@@ -57,7 +57,8 @@ final class SlowModelCatalogClient: ModelCatalogClient {
     struct Response {
         let baseURL: URL
         let delayNanoseconds: UInt64
-        let models: [String]
+        var models: [String] = []
+        var shouldFail: Bool = false
     }
 
     var responses: [Response] = []
@@ -65,17 +66,49 @@ final class SlowModelCatalogClient: ModelCatalogClient {
     func fetchModels(baseURL: URL) async throws -> [String] {
         guard let response = responses.first(where: { $0.baseURL == baseURL }) else { return [] }
         try await Task.sleep(nanoseconds: response.delayNanoseconds)
+        if response.shouldFail { throw FakeModelCatalogClientError.failed }
         return response.models
+    }
+}
+
+/// A `ModelCatalogClient` fake with one configurable delay before resolving,
+/// regardless of `baseURL` — for deterministically testing timeout behavior
+/// (delay it past an injected `modelFetchTimeoutNanoseconds` to force
+/// `.timedOut`, or keep it under to force a normal resolution).
+final class DelayedModelCatalogClient: ModelCatalogClient {
+    var delayNanoseconds: UInt64
+    var models: [String]
+    var shouldFail: Bool
+
+    init(delayNanoseconds: UInt64, models: [String] = [], shouldFail: Bool = false) {
+        self.delayNanoseconds = delayNanoseconds
+        self.models = models
+        self.shouldFail = shouldFail
+    }
+
+    func fetchModels(baseURL: URL) async throws -> [String] {
+        try await Task.sleep(nanoseconds: delayNanoseconds)
+        if shouldFail { throw FakeModelCatalogClientError.failed }
+        return models
     }
 }
 
 /// Builds an `AppModel` wired with fakes by default, so tests never trigger
 /// a real network call (e.g. via `AppModel.init`'s automatic initial model
-/// load) unless they explicitly ask for one.
+/// load) unless they explicitly ask for one. The timeout/retry-backoff
+/// durations default to millisecond scale (vs. production's 30s/5s) so
+/// timeout- and retry-loop tests never actually wait on wall-clock time.
 @MainActor
 func makeTestAppModel(
     backendClient: ChatBackendClient = FakeChatBackendClient(),
-    modelCatalogClient: ModelCatalogClient = FakeModelCatalogClient()
+    modelCatalogClient: ModelCatalogClient = FakeModelCatalogClient(),
+    modelFetchTimeoutNanoseconds: UInt64 = 30_000_000,
+    modelRetryBackoffNanoseconds: UInt64 = 10_000_000
 ) -> AppModel {
-    AppModel(backendClient: backendClient, modelCatalogClient: modelCatalogClient)
+    AppModel(
+        backendClient: backendClient,
+        modelCatalogClient: modelCatalogClient,
+        modelFetchTimeoutNanoseconds: modelFetchTimeoutNanoseconds,
+        modelRetryBackoffNanoseconds: modelRetryBackoffNanoseconds
+    )
 }

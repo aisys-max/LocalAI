@@ -31,7 +31,8 @@ struct ModelPickerView: View {
                         theme: theme,
                         strings: model.strings,
                         onSelect: { model.selectModel($0) },
-                        onRetry: { model.loadModels() }
+                        onRetry: { model.startModelRetryLoop() },
+                        hint: model.isRetryingModels ? model.strings.retryingAutomatically : nil
                     )
                     .padding(.bottom, 16)
 

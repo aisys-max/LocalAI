@@ -28,7 +28,8 @@ struct ModelStepView: View {
                     theme: theme,
                     strings: model.strings,
                     onSelect: { model.selectModel($0) },
-                    onRetry: { model.loadModels() }
+                    onRetry: { model.loadModels() },
+                    hint: model.strings.configureInSettingsHint
                 )
                 .padding(.bottom, 16)
             }

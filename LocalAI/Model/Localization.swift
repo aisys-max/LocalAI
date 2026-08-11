@@ -71,6 +71,9 @@ struct Strings {
     let noModelsFound: String
     let retry: String
     let noModelSelected: String
+    let modelLoadTimeout: String
+    let configureInSettingsHint: String
+    let retryingAutomatically: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
@@ -94,7 +97,10 @@ struct Strings {
         modelLoadError: "Couldn't load models from this server.",
         noModelsFound: "No models found on this server.",
         retry: "Retry",
-        noModelSelected: "Select a model"
+        noModelSelected: "Select a model",
+        modelLoadTimeout: "Couldn't load models within 30 seconds.",
+        configureInSettingsHint: "You can set this up later in Settings.",
+        retryingAutomatically: "Retrying automatically…"
     )
 
     static let ko = Strings(
@@ -119,7 +125,10 @@ struct Strings {
         modelLoadError: "이 서버에서 모델 목록을 가져오지 못했습니다.",
         noModelsFound: "이 서버에 설치된 모델이 없습니다.",
         retry: "다시 시도",
-        noModelSelected: "모델을 선택하세요"
+        noModelSelected: "모델을 선택하세요",
+        modelLoadTimeout: "30초 안에 모델 목록을 가져오지 못했습니다.",
+        configureInSettingsHint: "나중에 Settings에서 다시 설정할 수 있습니다.",
+        retryingAutomatically: "자동으로 다시 시도하는 중…"
     )
 
     func greeting(backendLabel: String, model: String?, language: AppLanguage) -> String {

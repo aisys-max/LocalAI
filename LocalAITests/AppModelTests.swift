@@ -255,6 +255,165 @@ import Foundation
         #expect(model.model == "recovered-model")
     }
 
+    @Test func loadModelsTimesOutWhenTheFetchExceedsTheTimeout() async {
+        let fake = DelayedModelCatalogClient(delayNanoseconds: 40_000_000, models: ["too-slow"])
+        let model = makeTestAppModel(modelCatalogClient: fake, modelFetchTimeoutNanoseconds: 10_000_000)
+
+        let state = await model.loadModels().value
+
+        #expect(state == .timedOut)
+        #expect(model.modelListState == .timedOut)
+    }
+
+    @Test func loadModelsResolvesNormallyWhenFasterThanTheTimeout() async {
+        let fake = DelayedModelCatalogClient(delayNanoseconds: 5_000_000, models: ["fast-enough"])
+        let model = makeTestAppModel(modelCatalogClient: fake, modelFetchTimeoutNanoseconds: 40_000_000)
+
+        let state = await model.loadModels().value
+
+        #expect(state == .loaded(["fast-enough"]))
+        #expect(model.model == "fast-enough")
+    }
+
+    @Test func retryLoopKeepsTryingUntilItSucceeds() async {
+        let fake = ToggleableModelCatalogClient(shouldFail: true)
+        let model = makeTestAppModel(modelCatalogClient: fake, modelRetryBackoffNanoseconds: 5_000_000)
+
+        let loopTask = model.startModelRetryLoop()
+        #expect(model.isRetryingModels == true)
+
+        // Let it fail at least once, then flip the fake to succeed.
+        try? await Task.sleep(nanoseconds: 12_000_000)
+        fake.shouldFail = false
+        fake.models = ["recovered-model"]
+
+        await loopTask.value
+
+        #expect(model.modelListState == .loaded(["recovered-model"]))
+        #expect(model.model == "recovered-model")
+        #expect(model.isRetryingModels == false) // loop clears itself on success
+    }
+
+    @Test func stopModelRetryLoopEndsTheLoopAndIgnoresLaterFakeChanges() async {
+        let fake = ToggleableModelCatalogClient(shouldFail: true)
+        let model = makeTestAppModel(modelCatalogClient: fake, modelRetryBackoffNanoseconds: 5_000_000)
+        model.startModelRetryLoop()
+
+        try? await Task.sleep(nanoseconds: 8_000_000)
+        model.stopModelRetryLoop()
+        #expect(model.isRetryingModels == false)
+
+        // Even though the fake would now succeed, nothing should pick it up
+        // — the loop was stopped, not paused.
+        fake.shouldFail = false
+        fake.models = ["should-not-appear"]
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        #expect(model.model != "should-not-appear")
+    }
+
+    @Test func selectBackendDuringAnActiveLoopKeepsRetryingForTheNewBackend() async {
+        let fake = SlowModelCatalogClient()
+        let ollamaURL = URL(string: Backend.ollama.defaultServerAddress)!
+        let lmstudioURL = URL(string: Backend.lmstudio.defaultServerAddress)!
+        // Ollama always fails (slowly enough to still be in flight when we
+        // switch Backend); LM Studio succeeds fast.
+        fake.responses = [
+            SlowModelCatalogClient.Response(baseURL: ollamaURL, delayNanoseconds: 40_000_000, shouldFail: true),
+            SlowModelCatalogClient.Response(baseURL: lmstudioURL, delayNanoseconds: 2_000_000, models: ["lmstudio-model"]),
+        ]
+        let model = makeTestAppModel(modelCatalogClient: fake, modelRetryBackoffNanoseconds: 5_000_000)
+
+        model.startModelRetryLoop()
+        try? await Task.sleep(nanoseconds: 5_000_000) // Ollama's attempt is still in flight (40ms delay)
+        #expect(model.isRetryingModels == true)
+
+        model.selectBackend(.lmstudio)
+        // selectBackend() re-enters the loop with a *new* task; don't await
+        // the old (now-superseded) loop task — wait for the new one to settle.
+        try? await Task.sleep(nanoseconds: 15_000_000)
+
+        #expect(model.backend == .lmstudio)
+        #expect(model.modelListState == .loaded(["lmstudio-model"]))
+        #expect(model.model == "lmstudio-model")
+    }
+
+    @Test func resumeModelRetryLoopIfNeededStartsALoopWhenAlreadyFailed() async {
+        let fake = FakeModelCatalogClient(shouldFail: true)
+        let model = makeTestAppModel(modelCatalogClient: fake)
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        #expect(model.modelListState == .failed)
+        #expect(model.isRetryingModels == false)
+
+        model.resumeModelRetryLoopIfNeeded()
+
+        #expect(model.isRetryingModels == true)
+    }
+
+    @Test func resumeModelRetryLoopIfNeededDoesNothingWhenAlreadyLoadedAndAddressUnchanged() async {
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]))
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        #expect(model.modelListState == .loaded(["m1"]))
+
+        model.resumeModelRetryLoopIfNeeded()
+
+        #expect(model.isRetryingModels == false)
+        #expect(model.modelListState == .loaded(["m1"])) // untouched
+    }
+
+    @Test func resumeModelRetryLoopIfNeededStartsAFreshLoadWhenTheAddressChangedSinceTheLastFetch() async {
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["old-address-model"]))
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        #expect(model.modelListState == .loaded(["old-address-model"]))
+
+        model.setServerAddress("http://192.168.1.50:11434", for: .ollama)
+        model.resumeModelRetryLoopIfNeeded()
+
+        #expect(model.model == nil) // cleared immediately
+        #expect(model.isRetryingModels == true)
+    }
+
+    @Test func editingTheAddressAloneDoesNotTriggerAReloadUntilNavigation() {
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]))
+        model.setServerAddress("http://192.168.1.50:11434", for: .ollama)
+
+        // No navigation happened — resumeModelRetryLoopIfNeeded() was never
+        // called, so nothing should have restarted yet (guards against
+        // reloading on every keystroke of a live-bound TextField).
+        #expect(model.isRetryingModels == false)
+    }
+
+    @Test func goChatStopsAnActiveRetryLoop() async {
+        let fake = FakeModelCatalogClient(shouldFail: true)
+        let model = makeTestAppModel(modelCatalogClient: fake)
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        model.resumeModelRetryLoopIfNeeded()
+        #expect(model.isRetryingModels == true)
+
+        model.goChat()
+
+        #expect(model.isRetryingModels == false)
+        #expect(model.screen == .chat)
+    }
+
+    @Test func closeModelPickerStopsTheLoopOnlyWhenReturningToChat() async {
+        let fake = FakeModelCatalogClient(shouldFail: true)
+
+        let fromChat = makeTestAppModel(modelCatalogClient: fake)
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        fromChat.openModelPicker(from: .chat)
+        #expect(fromChat.isRetryingModels == true)
+        fromChat.closeModelPicker()
+        #expect(fromChat.isRetryingModels == false)
+
+        let fromSettings = makeTestAppModel(modelCatalogClient: fake)
+        try? await Task.sleep(nanoseconds: 10_000_000)
+        fromSettings.openModelPicker(from: .settings)
+        #expect(fromSettings.isRetryingModels == true)
+        fromSettings.closeModelPicker()
+        #expect(fromSettings.isRetryingModels == true) // still within the Settings context
+    }
+
     @Test func rapidBackendSwitchesDoNotLetAStaleSlowFetchOverwriteNewerState() async {
         let fake = SlowModelCatalogClient()
         let ollamaURL = URL(string: Backend.ollama.defaultServerAddress)!
@@ -298,6 +457,17 @@ import Foundation
         model.finishOnboarding()
         #expect(model.screen == .chat)
         #expect(model.chats.count == chatCountBefore + 1)
+        #expect(model.currentChatId != nil)
+    }
+
+    @Test func finishOnboardingSucceedsEvenWithoutAModelSelected() {
+        // No selectModel() call — model.model stays nil (fetch never completed
+        // on this synchronous path). Onboarding should still be finishable;
+        // the user can pick a Model later in Settings.
+        let model = makeTestAppModel()
+        model.finishOnboarding()
+        #expect(model.screen == .chat)
+        #expect(model.model == nil)
         #expect(model.currentChatId != nil)
     }
 }
