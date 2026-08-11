@@ -41,7 +41,7 @@ final class AppModel: ObservableObject {
     var copyResetTask: Task<Void, Never>?
     let backendClient: ChatBackendClient
 
-    init(backendClient: ChatBackendClient = SimulatedChatBackendClient()) {
+    init(backendClient: ChatBackendClient = OpenAICompatibleChatBackendClient()) {
         self.backendClient = backendClient
         let seeded = SeedChats.make()
         self.chats = Dictionary(uniqueKeysWithValues: seeded.map { ($0.id, $0) })

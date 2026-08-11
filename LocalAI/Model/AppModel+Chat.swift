@@ -33,7 +33,7 @@ extension AppModel {
         draft = ""
         generating = true
 
-        streamReply(chatId: chatId, delayNanoseconds: 1_100_000_000)
+        streamReply(chatId: chatId, messages: chat.messages, delayNanoseconds: 1_100_000_000)
     }
 
     func regenerate(chatId: String, messageId: String) {
@@ -42,17 +42,18 @@ extension AppModel {
         chats[chatId] = chat
         generating = true
 
-        streamReply(chatId: chatId, delayNanoseconds: 900_000_000)
+        streamReply(chatId: chatId, messages: chat.messages, delayNanoseconds: 900_000_000)
     }
 
     /// Streams an assistant reply into a new `ChatMessage`, appending it on the
-    /// first chunk and growing its text as further chunks arrive.
-    private func streamReply(chatId: String, delayNanoseconds: UInt64) {
+    /// first chunk and growing its text as further chunks arrive. `messages` is
+    /// the conversation so far, sent to the backend as context for the reply.
+    private func streamReply(chatId: String, messages: [ChatMessage], delayNanoseconds: UInt64) {
         let assistantId = UUID().uuidString
         Task {
             var started = false
             do {
-                for try await chunk in backendClient.generateReply(chatId: chatId, model: model, delayNanoseconds: delayNanoseconds) {
+                for try await chunk in backendClient.generateReply(chatId: chatId, model: model, messages: messages, delayNanoseconds: delayNanoseconds) {
                     await MainActor.run {
                         if started {
                             self.appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)

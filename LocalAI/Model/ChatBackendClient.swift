@@ -5,11 +5,11 @@ import Foundation
 /// implementation passed into `AppModel.init(backendClient:)` when a real
 /// backend is wired up.
 protocol ChatBackendClient {
-    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error>
+    func generateReply(chatId: String, model: String, messages: [ChatMessage], delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error>
 }
 
 struct SimulatedChatBackendClient: ChatBackendClient {
-    func generateReply(chatId: String, model: String, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
+    func generateReply(chatId: String, model: String, messages: [ChatMessage], delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 try? await Task.sleep(nanoseconds: delayNanoseconds)
