@@ -47,6 +47,7 @@ struct Theme {
     let onAccentText: Color
     let selectedTint: Color
     let selectedText: Color
+    let destructive: Color
 
     static func resolve(dark: Bool) -> Theme {
         if dark {
@@ -61,7 +62,8 @@ struct Theme {
                 accent2: Palette.accent2,
                 onAccentText: Palette.Accent.a900,
                 selectedTint: Palette.Accent.a900,
-                selectedText: Palette.accent
+                selectedText: Palette.accent,
+                destructive: Color(hex: 0xFF6B6B)
             )
         } else {
             return Theme(
@@ -75,7 +77,8 @@ struct Theme {
                 accent2: Palette.accent2,
                 onAccentText: Palette.bg,
                 selectedTint: Palette.Accent.a100,
-                selectedText: Palette.Accent.a800
+                selectedText: Palette.Accent.a800,
+                destructive: Color(hex: 0xD64545)
             )
         }
     }

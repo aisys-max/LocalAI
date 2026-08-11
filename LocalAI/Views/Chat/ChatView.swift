@@ -16,6 +16,9 @@ struct ChatView: View {
                         .font(AppFont.heading(17))
                         .foregroundColor(theme.text)
                     Spacer()
+                    IconButtonView(systemName: "trash", theme: theme) {
+                        model.showDeleteChatConfirmation = true
+                    }
                     IconButtonView(systemName: "gearshape", theme: theme) {
                         model.goSettings()
                     }
@@ -68,6 +71,20 @@ struct ChatView: View {
             InputBarView(model: model, theme: theme)
         }
         .background(theme.bg.ignoresSafeArea())
+        .confirmationDialog(
+            model.strings.deleteChatConfirmTitle,
+            isPresented: $model.showDeleteChatConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(model.strings.delete, role: .destructive) {
+                if let id = model.currentChatId {
+                    model.deleteChat(id)
+                }
+                model.newChat()
+            }
+        } message: {
+            Text(model.strings.deleteChatConfirmMessage)
+        }
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {

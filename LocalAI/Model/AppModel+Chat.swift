@@ -6,7 +6,7 @@ extension AppModel {
         let id = "c\(Int(Date().timeIntervalSince1970 * 1000))"
         let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
         let chat = Chat(
-            id: id, day: .today, title: strings.newChat,
+            id: id, createdAt: Date(), title: strings.newChat,
             snippet: String(greeting.prefix(60)),
             messages: [ChatMessage(id: id + "-g", role: .assistant, text: greeting, model: model, isGreeting: true)]
         )
@@ -113,16 +113,66 @@ extension AppModel {
     }
 
     /// Chats grouped by day, ordered today → yesterday → previous7, each newest-first —
-    /// mirrors the design's `historyGroups`.
+    /// mirrors the design's `historyGroups`. Each chat's bucket is computed live from
+    /// `createdAt` (see `chatDayBucket`), so a chat correctly ages from Today to
+    /// Yesterday to Previous 7 Days as real time passes.
     var historyGroups: [(day: ChatDay, label: String, chats: [Chat])] {
+        let now = Date()
         let order: [ChatDay] = [.today, .yesterday, .previous7]
         let labels: [ChatDay: String] = [.today: strings.today, .yesterday: strings.yesterday, .previous7: strings.previous7]
         return order.compactMap { day in
-            let dayChats = chats.values.filter { $0.day == day }
+            let dayChats = chats.values.filter { chatDayBucket(for: $0.createdAt, now: now) == day }
             guard !dayChats.isEmpty else { return nil }
-            return (day, labels[day]!, dayChats.sorted { $0.id > $1.id })
+            return (day, labels[day]!, dayChats.sorted { $0.createdAt > $1.createdAt })
         }
     }
+
+    func deleteChats(in range: ChatDeleteRange, now: Date = Date(), calendar: Calendar = .current) {
+        let idsToDelete = chats.values
+            .filter { isChat($0, in: range, now: now, calendar: calendar) }
+            .map(\.id)
+        for id in idsToDelete {
+            chats.removeValue(forKey: id)
+        }
+        if let currentChatId, !chats.keys.contains(currentChatId) {
+            self.currentChatId = nil
+        }
+    }
+
+    private func isChat(_ chat: Chat, in range: ChatDeleteRange, now: Date, calendar: Calendar) -> Bool {
+        switch range {
+        case .today:
+            return chatDayBucket(for: chat.createdAt, now: now, calendar: calendar) == .today
+        case .sinceYesterday:
+            let bucket = chatDayBucket(for: chat.createdAt, now: now, calendar: calendar)
+            return bucket == .today || bucket == .yesterday
+        case .thisWeek:
+            return isChat(chat, in: .sinceYesterday, now: now, calendar: calendar)
+                || calendar.isDate(chat.createdAt, equalTo: now, toGranularity: .weekOfYear)
+        case .thisMonth:
+            return isChat(chat, in: .thisWeek, now: now, calendar: calendar)
+                || calendar.isDate(chat.createdAt, equalTo: now, toGranularity: .month)
+        case .all:
+            return true
+        }
+    }
+}
+
+/// The bucket a chat's `createdAt` falls into for History's grouping —
+/// computed live at call time (not stored), so chats age correctly without
+/// any background job. `now`/`calendar` are injectable for deterministic tests.
+func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> ChatDay {
+    if calendar.isDate(date, inSameDayAs: now) { return .today }
+    if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+        return .yesterday
+    }
+    return .previous7
+}
+
+/// The 5 selectable ranges for Settings' bulk-delete — cumulative supersets,
+/// Today ⊆ Since Yesterday ⊆ This Week ⊆ This Month ⊆ All.
+enum ChatDeleteRange: CaseIterable {
+    case today, sinceYesterday, thisWeek, thisMonth, all
 }
 
 extension Chat {

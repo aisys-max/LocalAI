@@ -177,6 +177,193 @@ import Foundation
         #expect(preview.user?.text == "unanswered question")
         #expect(preview.assistant == nil)
     }
+
+    @Test func newChatSetsCreatedAtToNow() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chat = model.chats[model.currentChatId!]!
+        #expect(abs(chat.createdAt.timeIntervalSinceNow) < 1)
+    }
+
+    // MARK: - chatDayBucket / historyGroups live bucketing
+
+    @Test func chatDayBucketReturnsTodayForATimestampEarlierTheSameDay() {
+        let now = DeleteRangeFixture.now
+        let earlierToday = DeleteRangeFixture.calendar.date(byAdding: .hour, value: -3, to: now)!
+        #expect(chatDayBucket(for: earlierToday, now: now, calendar: DeleteRangeFixture.calendar) == .today)
+    }
+
+    @Test func chatDayBucketReturnsYesterdayForATimestampYesterday() {
+        #expect(chatDayBucket(for: DeleteRangeFixture.yesterday, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .yesterday)
+    }
+
+    @Test func chatDayBucketReturnsPrevious7ForATimestampSeveralDaysAgo() {
+        #expect(chatDayBucket(for: DeleteRangeFixture.lastMonth, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .previous7)
+    }
+
+    @Test func chatDayBucketFlipsFromYesterdayToTodayOnceNowCrossesMidnight() {
+        // A timestamp at 23:59 stays "today" while `now` is still that same day...
+        let lateInTheDay = DeleteRangeFixture.calendar.date(byAdding: .minute, value: -1, to: DeleteRangeFixture.now)!
+        #expect(chatDayBucket(for: lateInTheDay, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .today)
+        // ...but becomes "yesterday" once `now` has moved to the next calendar day.
+        let nextDay = DeleteRangeFixture.calendar.date(byAdding: .day, value: 1, to: DeleteRangeFixture.now)!
+        #expect(chatDayBucket(for: lateInTheDay, now: nextDay, calendar: DeleteRangeFixture.calendar) == .yesterday)
+    }
+
+    @Test func historyGroupsBucketsLiveFromCreatedAtRatherThanAStaleStoredValue() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let recentId = model.currentChatId!
+        model.chats[recentId]!.createdAt = DeleteRangeFixture.now
+
+        let oldId = "old-chat"
+        model.chats[oldId] = DeleteRangeFixture.makeChat(id: oldId, createdAt: DeleteRangeFixture.lastMonth)
+
+        let groups = Dictionary(uniqueKeysWithValues: model.historyGroups.map { ($0.day, $0.chats.map(\.id)) })
+        #expect(groups[.previous7]?.contains(oldId) == true)
+        #expect(groups[.today]?.contains(oldId) != true)
+    }
+
+    // MARK: - deleteChats(in:)
+
+    @Test func deleteChatsInTodayRemovesOnlyTodaysChatsAndLeavesOthers() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] != nil)
+        #expect(model.chats["thisWeekEarlier"] != nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInSinceYesterdayRemovesTodayAndYesterdayButNotOlder() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .sinceYesterday, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] != nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInThisWeekRemovesEverythingFromTheCurrentCalendarWeek() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .thisWeek, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] == nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInThisMonthRemovesEverythingFromTheCurrentCalendarMonthIncludingEarlierWeeksOfIt() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .thisMonth, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] == nil)
+        #expect(model.chats["thisMonthEarlierWeek"] == nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInAllRemovesEveryChatRegardlessOfCreatedAt() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .all, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats.isEmpty)
+    }
+
+    @Test func deleteChatsInAllOnAnEmptyChatsDictionaryIsANoOp() {
+        let model = makeTestAppModel()
+        model.deleteChats(in: .all)
+        #expect(model.chats.isEmpty)
+    }
+
+    @Test func deleteChatsInRangeClearsCurrentChatIdWhenTheOpenChatFallsInRange() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.currentChatId = "today"
+
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.currentChatId == nil)
+    }
+
+    @Test func deleteChatsInRangeLeavesCurrentChatIdUntouchedWhenTheOpenChatIsOutsideRange() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.currentChatId = "lastMonth"
+
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.currentChatId == "lastMonth")
+    }
+
+    @Test func deletingTheCurrentChatFollowedByNewChatLeavesExactlyOneFreshChat() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let oldId = model.currentChatId!
+        model.chats[oldId]!.messages.append(ChatMessage(id: "extra", role: .user, text: "some history"))
+
+        // Mirrors ChatView's confirmation-dialog handler. newChat() derives ids from a
+        // millisecond timestamp, so back-to-back calls can land on the same id — assert
+        // on the resulting chat's freshness rather than id (in)equality.
+        model.deleteChat(oldId)
+        model.newChat()
+
+        #expect(model.chats.count == 1)
+        #expect(model.currentChatId != nil)
+        let freshChat = model.chats[model.currentChatId!]!
+        #expect(freshChat.messages.count == 1)
+        #expect(freshChat.messages.first?.isGreeting == true)
+    }
+}
+
+/// Fixed, deterministic dates for range/bucketing tests — real wall-clock
+/// `Date()` would make week/month-boundary assertions flaky depending on
+/// when the test happens to run.
+private enum DeleteRangeFixture {
+    static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 1 // Sunday
+        return calendar
+    }()
+
+    /// Wednesday, June 12 2024, safely mid-week and mid-month.
+    static let now: Date = date(year: 2024, month: 6, day: 12, hour: 12)
+    /// Same week as `now` (week runs Sun June 9 – Sat June 15).
+    static let yesterday: Date = date(year: 2024, month: 6, day: 11, hour: 12)
+    static let thisWeekEarlier: Date = date(year: 2024, month: 6, day: 9, hour: 8)
+    /// Previous week (June 2–8), same month as `now`.
+    static let thisMonthEarlierWeek: Date = date(year: 2024, month: 6, day: 2, hour: 8)
+    /// A different month entirely.
+    static let lastMonth: Date = date(year: 2024, month: 5, day: 15, hour: 8)
+
+    static func date(year: Int, month: Int, day: Int, hour: Int) -> Date {
+        var components = DateComponents()
+        components.year = year; components.month = month; components.day = day; components.hour = hour
+        return calendar.date(from: components)!
+    }
+
+    static func makeChat(id: String, createdAt: Date) -> Chat {
+        Chat(id: id, createdAt: createdAt, title: "title", snippet: "snippet", messages: [])
+    }
+
+    @MainActor
+    static func makeModelWithOneChatPerBucket() -> AppModel {
+        let model = makeTestAppModel()
+        model.chats = [
+            "today": makeChat(id: "today", createdAt: now),
+            "yesterday": makeChat(id: "yesterday", createdAt: yesterday),
+            "thisWeekEarlier": makeChat(id: "thisWeekEarlier", createdAt: thisWeekEarlier),
+            "thisMonthEarlierWeek": makeChat(id: "thisMonthEarlierWeek", createdAt: thisMonthEarlierWeek),
+            "lastMonth": makeChat(id: "lastMonth", createdAt: lastMonth),
+        ]
+        model.currentChatId = nil
+        return model
+    }
 }
 
 @MainActor

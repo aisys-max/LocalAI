@@ -75,6 +75,19 @@ struct Strings {
     let configureInSettingsHint: String
     let retryingAutomatically: String
     let delete: String
+    let deleteChatConfirmTitle: String
+    let deleteChatConfirmMessage: String
+    let sectionDeleteConversations: String
+    let deleteConversationsRowTitle: String
+    let deleteRangeToday: String
+    let deleteRangeSinceYesterday: String
+    let deleteRangeThisWeek: String
+    let deleteRangeThisMonth: String
+    let deleteRangeAll: String
+    let deleteRangeDialogTitle: String
+    let deleteAllConfirmTitle: String
+    let deleteAllConfirmMessage: String
+    let cancel: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
@@ -102,7 +115,20 @@ struct Strings {
         modelLoadTimeout: "Couldn't load models within 30 seconds.",
         configureInSettingsHint: "You can set this up later in Settings.",
         retryingAutomatically: "Retrying automatically…",
-        delete: "Delete"
+        delete: "Delete",
+        deleteChatConfirmTitle: "Delete this chat?",
+        deleteChatConfirmMessage: "This can't be undone.",
+        sectionDeleteConversations: "Delete Conversations",
+        deleteConversationsRowTitle: "Delete Conversations…",
+        deleteRangeToday: "Today",
+        deleteRangeSinceYesterday: "Since Yesterday",
+        deleteRangeThisWeek: "This Week",
+        deleteRangeThisMonth: "This Month",
+        deleteRangeAll: "All",
+        deleteRangeDialogTitle: "Delete conversations…",
+        deleteAllConfirmTitle: "Delete all conversations?",
+        deleteAllConfirmMessage: "This permanently deletes every conversation and can't be undone.",
+        cancel: "Cancel"
     )
 
     static let ko = Strings(
@@ -131,7 +157,20 @@ struct Strings {
         modelLoadTimeout: "30초 안에 모델 목록을 가져오지 못했습니다.",
         configureInSettingsHint: "나중에 Settings에서 다시 설정할 수 있습니다.",
         retryingAutomatically: "자동으로 다시 시도하는 중…",
-        delete: "삭제"
+        delete: "삭제",
+        deleteChatConfirmTitle: "이 대화를 삭제할까요?",
+        deleteChatConfirmMessage: "이 작업은 되돌릴 수 없습니다.",
+        sectionDeleteConversations: "대화 삭제",
+        deleteConversationsRowTitle: "대화 삭제…",
+        deleteRangeToday: "오늘",
+        deleteRangeSinceYesterday: "어제부터",
+        deleteRangeThisWeek: "이번주",
+        deleteRangeThisMonth: "이번달",
+        deleteRangeAll: "전체",
+        deleteRangeDialogTitle: "대화 삭제…",
+        deleteAllConfirmTitle: "모든 대화를 삭제할까요?",
+        deleteAllConfirmMessage: "모든 대화가 영구적으로 삭제되며 되돌릴 수 없습니다.",
+        cancel: "취소"
     )
 
     func greeting(backendLabel: String, model: String?, language: AppLanguage) -> String {
