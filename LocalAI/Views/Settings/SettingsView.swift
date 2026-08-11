@@ -23,7 +23,7 @@ struct SettingsView: View {
                         GroupRow(theme: theme, isFirst: false) {
                             model.openModelPicker(from: .settings)
                         } content: {
-                            Text(model.model)
+                            Text(model.model ?? model.strings.noModelSelected)
                                 .foregroundColor(theme.text)
                             Spacer()
                             Image(systemName: "chevron.right")

@@ -66,6 +66,11 @@ struct Strings {
     let ollamaDesc: String
     let lmstudioDesc: String
     let inputPlaceholder: String
+    let loadingModels: String
+    let modelLoadError: String
+    let noModelsFound: String
+    let retry: String
+    let noModelSelected: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
@@ -84,7 +89,12 @@ struct Strings {
         getStarted: "Get Started", copy: "Copy", copied: "Copied", regenerate: "Regenerate",
         ollamaDesc: "Connects to a local Ollama server (localhost:11434).",
         lmstudioDesc: "Connects to a local LM Studio server (OpenAI-compatible API).",
-        inputPlaceholder: "Message Local AI…"
+        inputPlaceholder: "Message Local AI…",
+        loadingModels: "Loading models…",
+        modelLoadError: "Couldn't load models from this server.",
+        noModelsFound: "No models found on this server.",
+        retry: "Retry",
+        noModelSelected: "Select a model"
     )
 
     static let ko = Strings(
@@ -104,15 +114,21 @@ struct Strings {
         getStarted: "시작하기", copy: "복사", copied: "복사됨", regenerate: "다시 생성",
         ollamaDesc: "로컬 Ollama 서버(localhost:11434)에 연결됩니다.",
         lmstudioDesc: "로컬 LM Studio 서버(OpenAI 호환 API)에 연결됩니다.",
-        inputPlaceholder: "Local AI에게 메시지 보내기…"
+        inputPlaceholder: "Local AI에게 메시지 보내기…",
+        loadingModels: "모델을 불러오는 중…",
+        modelLoadError: "이 서버에서 모델 목록을 가져오지 못했습니다.",
+        noModelsFound: "이 서버에 설치된 모델이 없습니다.",
+        retry: "다시 시도",
+        noModelSelected: "모델을 선택하세요"
     )
 
-    func greeting(backendLabel: String, model: String, language: AppLanguage) -> String {
+    func greeting(backendLabel: String, model: String?, language: AppLanguage) -> String {
+        let modelLabel = model ?? (language == .en ? "a model you'll pick" : "선택할 모델")
         switch language {
         case .en:
-            return "Hi — I'm running locally via \(backendLabel) on \(model). Ask me anything, nothing leaves your phone."
+            return "Hi — I'm running locally via \(backendLabel) on \(modelLabel). Ask me anything, nothing leaves your phone."
         case .ko:
-            return "안녕하세요 — 저는 \(backendLabel)을 통해 \(model) 모델로 기기에서 직접 실행되고 있어요. 무엇이든 물어보세요, 아무것도 기기 밖으로 전송되지 않습니다."
+            return "안녕하세요 — 저는 \(backendLabel)을 통해 \(modelLabel)로 기기에서 직접 실행되고 있어요. 무엇이든 물어보세요, 아무것도 기기 밖으로 전송되지 않습니다."
         }
     }
 }

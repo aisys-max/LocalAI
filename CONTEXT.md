@@ -16,6 +16,10 @@ _Avoid_: Base URL, endpoint (in user-facing/Settings contexts — "base URL" is 
 A specific LLM (e.g. "Llama 3.1 8B") available on the currently selected Backend. The list of Models for a Backend is fetched live from that Backend, not hardcoded.
 _Avoid_: Checkpoint, engine.
 
+**Model list fetch**:
+The in-flight act of loading a Backend's Model list, in one of three states: loading, loaded (possibly empty — a reachable Backend with nothing installed), or failed (unreachable, bad response). A failed or empty fetch is shown as its own state — it never falls back to a stale or hardcoded list. Triggered on app start and whenever the Backend changes; switching Backend again while a fetch is in flight cancels it, so a slow, stale fetch can't land after and overwrite a newer one.
+_Avoid_: Model loading (ambiguous with a Model itself being "loaded" into a Backend).
+
 **Chat**:
 A single conversation thread: an ordered list of ChatMessages plus display metadata (title, snippet, day grouping). Identified by id, stored in `AppModel.chats`.
 _Avoid_: Conversation, session, thread.

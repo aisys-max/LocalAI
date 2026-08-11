@@ -22,7 +22,7 @@ struct ChatView: View {
                 }
                 .padding(.horizontal, 14)
 
-                Text("\(model.model) · \(model.backend.label)")
+                Text("\(model.model ?? model.strings.noModelSelected) · \(model.backend.label)")
                     .font(AppFont.body(11.5, weight: .semibold))
                     .foregroundColor(theme.textMuted)
                     .padding(.horizontal, 14)

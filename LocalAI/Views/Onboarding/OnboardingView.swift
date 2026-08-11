@@ -46,14 +46,20 @@ struct OnboardingView: View {
                         .padding(.vertical, 14)
                         .background(Capsule().fill(theme.accent))
                         .foregroundColor(theme.onAccentText)
+                        .opacity(primaryDisabled ? 0.5 : 1)
                 }
                 .buttonStyle(.plain)
+                .disabled(primaryDisabled)
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 26)
             .padding(.top, 10)
         }
         .background(theme.bg.ignoresSafeArea())
+    }
+
+    private var primaryDisabled: Bool {
+        model.onboardingStep == 2 && model.model == nil
     }
 
     private var primaryLabel: String {

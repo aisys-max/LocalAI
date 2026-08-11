@@ -23,7 +23,8 @@ final class AppModel: ObservableObject {
 
     // MARK: - Settings (AppModel+Settings.swift)
     @Published var backend: Backend = .ollama
-    @Published var model: String
+    @Published var model: String?
+    @Published var modelListState: ModelListState = .loading
     @Published var appearance: AppearanceMode = .system
     @Published var systemColorScheme: ColorScheme = .light
     @Published var language: AppLanguage = .en
@@ -40,13 +41,19 @@ final class AppModel: ObservableObject {
     @Published var copiedId: String?
 
     var copyResetTask: Task<Void, Never>?
+    var modelLoadTask: Task<Void, Never>?
     let backendClient: ChatBackendClient
+    let modelCatalogClient: ModelCatalogClient
 
-    init(backendClient: ChatBackendClient = OpenAICompatibleChatBackendClient()) {
+    init(
+        backendClient: ChatBackendClient = OpenAICompatibleChatBackendClient(),
+        modelCatalogClient: ModelCatalogClient = OpenAICompatibleModelCatalogClient()
+    ) {
         self.backendClient = backendClient
+        self.modelCatalogClient = modelCatalogClient
         let seeded = SeedChats.make()
         self.chats = Dictionary(uniqueKeysWithValues: seeded.map { ($0.id, $0) })
-        self.model = Backend.ollama.models[0]
+        loadModels()
     }
 
     // MARK: - Derived

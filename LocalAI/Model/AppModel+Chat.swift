@@ -31,24 +31,31 @@ extension AppModel {
         chats[chatId] = chat
 
         draft = ""
+
+        // No Model selected yet (still loading, or the fetch failed) — the
+        // user's message stays posted, but there's nothing to send it to.
+        guard let model else { return }
         generating = true
 
-        streamReply(chatId: chatId, messages: chat.messages, delayNanoseconds: 1_100_000_000)
+        streamReply(chatId: chatId, model: model, messages: chat.messages, delayNanoseconds: 1_100_000_000)
     }
 
     func regenerate(chatId: String, messageId: String) {
         guard var chat = chats[chatId] else { return }
         chat.messages.removeAll { $0.id == messageId }
         chats[chatId] = chat
+
+        // See sendMessage() — no Model selected yet, nothing to regenerate with.
+        guard let model else { return }
         generating = true
 
-        streamReply(chatId: chatId, messages: chat.messages, delayNanoseconds: 900_000_000)
+        streamReply(chatId: chatId, model: model, messages: chat.messages, delayNanoseconds: 900_000_000)
     }
 
     /// Streams an assistant reply into a new `ChatMessage`, appending it on the
     /// first chunk and growing its text as further chunks arrive. `messages` is
     /// the conversation so far, sent to the backend as context for the reply.
-    private func streamReply(chatId: String, messages: [ChatMessage], delayNanoseconds: UInt64) {
+    private func streamReply(chatId: String, model: String, messages: [ChatMessage], delayNanoseconds: UInt64) {
         let assistantId = UUID().uuidString
         Task {
             var started = false

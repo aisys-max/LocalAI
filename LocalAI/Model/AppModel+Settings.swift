@@ -3,7 +3,8 @@ import Foundation
 extension AppModel {
     func selectBackend(_ b: Backend) {
         backend = b
-        model = b.models[0]
+        model = nil
+        loadModels()
     }
     func selectModel(_ m: String) { model = m }
     func setAppearance(_ a: AppearanceMode) { appearance = a }
