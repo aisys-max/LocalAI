@@ -15,6 +15,9 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        NSLocalNetworkUsageDescription: "Local AI connects to a local Ollama or LM Studio server on your network to chat with your on-device models."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.local.localai
