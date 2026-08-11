@@ -27,6 +27,7 @@ final class AppModel: ObservableObject {
     @Published var appearance: AppearanceMode = .system
     @Published var systemColorScheme: ColorScheme = .light
     @Published var language: AppLanguage = .en
+    @Published var backendServerAddresses: [Backend: String] = [:]
 
     // MARK: - Onboarding (AppModel+Onboarding.swift)
     @Published var onboardingStep: Int = 0

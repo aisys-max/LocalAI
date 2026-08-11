@@ -1,10 +1,11 @@
+import Foundation
 @testable import LocalAI
 
 struct FakeChatBackendClient: ChatBackendClient {
     var reply: String = "fake reply"
     var chunks: [String]?
 
-    func generateReply(chatId: String, model: String, messages: [ChatMessage], delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
+    func generateReply(chatId: String, model: String, messages: [ChatMessage], baseURL: URL, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             for chunk in chunks ?? [reply] {
                 continuation.yield(chunk)

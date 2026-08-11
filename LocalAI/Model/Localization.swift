@@ -38,6 +38,7 @@ struct Strings {
     let yesterday: String
     let previous7: String
     let sectionModel: String
+    let serverAddress: String
     let sectionAppearance: String
     let sectionLanguage: String
     let sectionAbout: String
@@ -69,7 +70,8 @@ struct Strings {
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
         today: "Today", yesterday: "Yesterday", previous7: "Previous 7 Days",
-        sectionModel: "Model", sectionAppearance: "Appearance", sectionLanguage: "Language", sectionAbout: "About",
+        sectionModel: "Model", serverAddress: "Server Address",
+        sectionAppearance: "Appearance", sectionLanguage: "Language", sectionAbout: "About",
         light: "Light", dark: "Dark", system: "System",
         privacyPolicy: "Privacy Policy", terms: "Terms of Service", safety: "Safety Information", security: "Security",
         version: "Version 1.0.0", modelPickerTitle: "Choose Model", done: "Done",
@@ -88,7 +90,8 @@ struct Strings {
     static let ko = Strings(
         appName: "Local AI", newChat: "새 대화", historyTitle: "기록", settingsTitle: "설정",
         today: "오늘", yesterday: "어제", previous7: "지난 7일",
-        sectionModel: "모델", sectionAppearance: "화면 모드", sectionLanguage: "언어", sectionAbout: "정보",
+        sectionModel: "모델", serverAddress: "서버 주소",
+        sectionAppearance: "화면 모드", sectionLanguage: "언어", sectionAbout: "정보",
         light: "라이트", dark: "다크", system: "시스템",
         privacyPolicy: "개인정보 처리방침", terms: "서비스 이용약관", safety: "안전 정보", security: "보안",
         version: "버전 1.0.0", modelPickerTitle: "모델 선택", done: "완료",

@@ -5,8 +5,12 @@ A SwiftUI local-LLM chat client that talks to a locally-running Ollama or LM Stu
 ## Language
 
 **Backend**:
-A locally-running LLM server the app connects to for generating replies — either Ollama or LM Studio. Each Backend has its own base URL and its own list of installable Models.
+A locally-running LLM server the app connects to for generating replies — either Ollama or LM Studio. Each Backend has its own Server Address and its own list of installable Models.
 _Avoid_: Provider, model server.
+
+**Server Address**:
+The URL a Backend is reached at (e.g. `http://localhost:11434`). Each Backend has its own, editable in Settings and defaulting to that Backend's standard local port; not persisted across app relaunches.
+_Avoid_: Base URL, endpoint (in user-facing/Settings contexts — "base URL" is fine as an internal implementation term).
 
 **Model**:
 A specific LLM (e.g. "Llama 3.1 8B") available on the currently selected Backend. The list of Models for a Backend is fetched live from that Backend, not hardcoded.
