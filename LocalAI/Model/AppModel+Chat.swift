@@ -8,7 +8,7 @@ extension AppModel {
         let chat = Chat(
             id: id, day: .today, title: strings.newChat,
             snippet: String(greeting.prefix(60)),
-            messages: [ChatMessage(id: id + "-g", role: .assistant, text: greeting, model: model)]
+            messages: [ChatMessage(id: id + "-g", role: .assistant, text: greeting, model: model, isGreeting: true)]
         )
         chats[id] = chat
         currentChatId = id
