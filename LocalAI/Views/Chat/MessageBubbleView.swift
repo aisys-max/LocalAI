@@ -74,12 +74,7 @@ struct MessageBubbleView: View {
         }
         .padding(.horizontal, 15)
         .padding(.vertical, 11)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(isUser ? theme.accent : theme.surface)
-        )
-        .frame(maxWidth: 320, alignment: isUser ? .trailing : .leading)
-        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .chatBubbleStyle(isUser: isUser, theme: theme, cornerRadius: 20, maxWidth: 320)
         .padding(.horizontal, 14)
         .padding(.vertical, 4)
     }

@@ -10,42 +10,72 @@ struct HistoryView: View {
                 IconButtonView(systemName: "plus", theme: theme) { model.newChat() }
             }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(model.historyGroups, id: \.day) { group in
+            List {
+                ForEach(model.historyGroups, id: \.day) { group in
+                    Section {
+                        ForEach(group.chats) { chat in
+                            HistoryChatCardView(chat: chat, theme: theme)
+                                .contentShape(Rectangle())
+                                .onTapGesture { model.openChat(chat.id) }
+                                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        model.deleteChat(chat.id)
+                                    } label: {
+                                        Label(model.strings.delete, systemImage: "trash")
+                                    }
+                                }
+                        }
+                    } header: {
                         Text(group.label.uppercased())
                             .font(AppFont.body(11, weight: .bold))
                             .tracking(0.5)
                             .foregroundColor(theme.textMuted)
-                            .padding(.top, 18)
-                            .padding(.bottom, 8)
-                            .padding(.horizontal, 2)
-
-                        ForEach(group.chats) { chat in
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(chat.title)
-                                    .font(AppFont.body(14.5, weight: .semibold))
-                                    .foregroundColor(theme.text)
-                                Text(chat.snippet)
-                                    .font(AppFont.body(12.5))
-                                    .foregroundColor(theme.textMuted)
-                                    .lineLimit(1)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 13)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(RoundedRectangle(cornerRadius: 16).fill(theme.surface))
-                            .padding(.bottom, 8)
-                            .contentShape(Rectangle())
-                            .onTapGesture { model.openChat(chat.id) }
-                        }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                            .listRowInsets(EdgeInsets())
                     }
+                    .listSectionSeparator(.hidden)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
         }
         .background(theme.bg.ignoresSafeArea())
+    }
+}
+
+/// A History row previewing a chat as a miniature version of its opening
+/// exchange — same bubble colors/alignment as `MessageBubbleView` in the
+/// Chatting screen, so the preview reads as "this chat, smaller" rather
+/// than a differently-styled summary card.
+private struct HistoryChatCardView: View {
+    let chat: Chat
+    let theme: Theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            let preview = chat.previewExchange
+            if let assistant = preview.assistant {
+                bubble(text: assistant.text, isUser: false)
+            }
+            if let user = preview.user {
+                bubble(text: user.text, isUser: true)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    private func bubble(text: String, isUser: Bool) -> some View {
+        Text(text)
+            .font(AppFont.body(13))
+            .foregroundColor(isUser ? theme.onAccentText : theme.text)
+            .lineLimit(2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .chatBubbleStyle(isUser: isUser, theme: theme, cornerRadius: 16, maxWidth: 240)
     }
 }
 
