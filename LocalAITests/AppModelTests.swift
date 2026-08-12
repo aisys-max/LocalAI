@@ -177,6 +177,56 @@ import Foundation
         #expect(preview.user?.text == "unanswered question")
         #expect(preview.assistant == nil)
     }
+
+    @Test func upFrontStreamFailureAppendsAnInlineAssistantMessageAndClearsGenerating() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(error: URLError(.cannotConnectToHost)))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.draft = "hi"
+        model.sendMessage()
+        #expect(model.generating == true)
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        #expect(model.generating == false)
+        #expect(model.chats[chatId]?.messages.last?.role == .assistant)
+        #expect(model.chats[chatId]?.messages.last?.text == model.strings.replyErrorUnreachable)
+    }
+
+    @Test func partwayStreamFailureKeepsTheReceivedTextAndAppendsAFollowUpFailureMessage() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(chunks: ["partial "], error: URLError(.timedOut)))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.draft = "hi"
+        model.sendMessage()
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        #expect(model.generating == false)
+        let messages = model.chats[chatId]?.messages ?? []
+        #expect(messages.dropLast().last?.text == "partial ")
+        #expect(messages.last?.role == .assistant)
+        #expect(messages.last?.text == model.strings.replyErrorTimeout)
+    }
+
+    @Test func modelNotFoundStreamFailureAppendsTheModelNotFoundMessage() async {
+        let error = OpenAICompatibleChatBackendClientError.badResponse(statusCode: 404)
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(error: error))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.draft = "hi"
+        model.sendMessage()
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        #expect(model.chats[chatId]?.messages.last?.text == model.strings.replyErrorModelNotFound)
+    }
 }
 
 @MainActor
