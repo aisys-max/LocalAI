@@ -66,23 +66,34 @@ extension AppModel {
                     }
                 }
             } catch {
-                // Surfacing generation failures to the user is handled separately.
+                await MainActor.run {
+                    self.appendFailureMessage(chatId: chatId, error: error)
+                }
             }
             await MainActor.run { self.generating = false }
         }
     }
 
     private func beginReply(chatId: String, messageId: String, chunk: String) {
-        guard var chat = chats[chatId] else { return }
-        chat.messages.append(ChatMessage(id: messageId, role: .assistant, text: chunk, model: model))
-        chat.snippet = String(chunk.prefix(60))
-        chats[chatId] = chat
+        appendAssistantMessage(chatId: chatId, message: ChatMessage(id: messageId, role: .assistant, text: chunk, model: model))
     }
 
     private func appendReplyChunk(chatId: String, messageId: String, chunk: String) {
         guard var chat = chats[chatId], let index = chat.messages.firstIndex(where: { $0.id == messageId }) else { return }
         chat.messages[index].text += chunk
         chat.snippet = String(chat.messages[index].text.prefix(60))
+        chats[chatId] = chat
+    }
+
+    private func appendFailureMessage(chatId: String, error: Error) {
+        let text = strings.replyFailureMessage(for: classifyChatReplyFailure(error))
+        appendAssistantMessage(chatId: chatId, message: ChatMessage(id: UUID().uuidString, role: .assistant, text: text))
+    }
+
+    private func appendAssistantMessage(chatId: String, message: ChatMessage) {
+        guard var chat = chats[chatId] else { return }
+        chat.messages.append(message)
+        chat.snippet = String(message.text.prefix(60))
         chats[chatId] = chat
     }
 
