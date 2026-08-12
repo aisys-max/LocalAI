@@ -20,8 +20,11 @@ struct OpenAICompatibleChatBackendClient: ChatBackendClient {
                     let request = try makeRequest(model: model, messages: messages, baseURL: baseURL)
                     let (bytes, response) = try await session.bytes(for: request)
 
-                    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                        throw OpenAICompatibleChatBackendClientError.badResponse
+                    guard let http = response as? HTTPURLResponse else {
+                        throw OpenAICompatibleChatBackendClientError.badResponse(statusCode: nil)
+                    }
+                    guard (200..<300).contains(http.statusCode) else {
+                        throw OpenAICompatibleChatBackendClientError.badResponse(statusCode: http.statusCode)
                     }
 
                     for try await line in bytes.lines {
@@ -60,7 +63,7 @@ struct OpenAICompatibleChatBackendClient: ChatBackendClient {
 }
 
 enum OpenAICompatibleChatBackendClientError: Error {
-    case badResponse
+    case badResponse(statusCode: Int?)
 }
 
 struct ChatCompletionRequest: Codable {
