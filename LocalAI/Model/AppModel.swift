@@ -35,10 +35,6 @@ final class AppModel: ObservableObject {
     @Published var systemColorScheme: ColorScheme = .light
     @Published var language: AppLanguage = .en
     @Published var backendServerAddresses: [Backend: String] = [:]
-    @Published var showDeleteRangeDialog: Bool = false
-    /// The range awaiting a second confirmation — only ever set to `.all`,
-    /// the sole range severe enough to need one beyond the dialog itself.
-    @Published var pendingDeleteRange: ChatDeleteRange?
 
     // MARK: - Onboarding (AppModel+Onboarding.swift)
     @Published var onboardingStep: Int = 0
@@ -49,7 +45,10 @@ final class AppModel: ObservableObject {
     @Published var draft: String = ""
     @Published var generating: Bool = false
     @Published var copiedId: String?
-    @Published var showDeleteChatConfirmation: Bool = false
+    @Published var showDeleteRangeDialog: Bool = false
+    /// The range awaiting a second confirmation — only ever set to `.all`,
+    /// the sole range severe enough to need one beyond the dialog itself.
+    @Published var pendingDeleteRange: ChatDeleteRange?
 
     var copyResetTask: Task<Void, Never>?
     var modelLoadTask: Task<ModelListState, Never>?

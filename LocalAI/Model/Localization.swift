@@ -71,10 +71,6 @@ struct Strings {
     let configureInSettingsHint: String
     let retryingAutomatically: String
     let delete: String
-    let deleteChatConfirmTitle: String
-    let deleteChatConfirmMessage: String
-    let sectionDeleteConversations: String
-    let deleteConversationsRowTitle: String
     let deleteRangeToday: String
     let deleteRangeSinceYesterday: String
     let deleteRangeThisWeek: String
@@ -111,10 +107,6 @@ struct Strings {
         configureInSettingsHint: "You can set this up later in Settings.",
         retryingAutomatically: "Retrying automatically…",
         delete: "Delete",
-        deleteChatConfirmTitle: "Delete this chat?",
-        deleteChatConfirmMessage: "This can't be undone.",
-        sectionDeleteConversations: "Delete Conversations",
-        deleteConversationsRowTitle: "Delete Conversations…",
         deleteRangeToday: "Today",
         deleteRangeSinceYesterday: "Since Yesterday",
         deleteRangeThisWeek: "This Week",
@@ -152,10 +144,6 @@ struct Strings {
         configureInSettingsHint: "나중에 Settings에서 다시 설정할 수 있습니다.",
         retryingAutomatically: "자동으로 다시 시도하는 중…",
         delete: "삭제",
-        deleteChatConfirmTitle: "이 대화를 삭제할까요?",
-        deleteChatConfirmMessage: "이 작업은 되돌릴 수 없습니다.",
-        sectionDeleteConversations: "대화 삭제",
-        deleteConversationsRowTitle: "대화 삭제…",
         deleteRangeToday: "오늘",
         deleteRangeSinceYesterday: "어제부터",
         deleteRangeThisWeek: "이번주",

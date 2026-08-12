@@ -89,40 +89,43 @@ import Foundation
         #expect(model.copiedId == "m1")
     }
 
-    @Test func deleteChatRemovesItFromChats() {
+    @Test func deleteMessageRemovesItFromTheChat() {
         let model = makeTestAppModel()
         model.newChat()
         let chatId = model.currentChatId!
+        let greetingId = model.chats[chatId]!.messages[0].id
 
-        model.deleteChat(chatId)
+        model.deleteMessage(chatId: chatId, messageId: greetingId)
 
-        #expect(model.chats[chatId] == nil)
+        #expect(model.chats[chatId]?.messages.contains { $0.id == greetingId } == false)
     }
 
-    @Test func deleteChatClearsCurrentChatIdWhenDeletingTheOpenChat() {
+    @Test func deleteMessageLeavesOtherMessagesInPlace() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "hello there"))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+        let greetingId = model.chats[chatId]!.messages[0].id
+
+        model.draft = "hi"
+        model.sendMessage()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let userMessageId = model.chats[chatId]!.messages[1].id
+
+        model.deleteMessage(chatId: chatId, messageId: greetingId)
+
+        #expect(model.chats[chatId]?.messages.contains { $0.id == userMessageId } == true)
+    }
+
+    @Test func deleteMessageWithAnUnknownChatIdIsANoOp() {
         let model = makeTestAppModel()
         model.newChat()
         let chatId = model.currentChatId!
+        let messageCountBefore = model.chats[chatId]!.messages.count
 
-        model.deleteChat(chatId)
+        model.deleteMessage(chatId: "no-such-chat", messageId: "no-such-message")
 
-        #expect(model.currentChatId == nil)
-    }
-
-    @Test func deleteChatLeavesCurrentChatIdUntouchedWhenDeletingADifferentChat() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let openChatId = model.currentChatId!
-        // A second chat with a distinct id — newChat() derives ids from a
-        // millisecond timestamp, so building this one by hand avoids a
-        // same-millisecond collision with openChatId in a fast test run.
-        let otherChatId = "other-chat"
-        model.chats[otherChatId] = model.chats[openChatId]
-
-        model.deleteChat(otherChatId)
-
-        #expect(model.currentChatId == openChatId)
-        #expect(model.chats[otherChatId] == nil)
+        #expect(model.chats[chatId]?.messages.count == messageCountBefore)
     }
 
     @Test func newChatSetsCreatedAtToNow() {
@@ -234,16 +237,16 @@ import Foundation
         #expect(model.currentChatId == "lastMonth")
     }
 
-    @Test func deletingTheCurrentChatFollowedByNewChatLeavesExactlyOneFreshChat() {
+    @Test func deletingAllChatsFollowedByNewChatLeavesExactlyOneFreshChat() {
         let model = makeTestAppModel()
         model.newChat()
         let oldId = model.currentChatId!
         model.chats[oldId]!.messages.append(ChatMessage(id: "extra", role: .user, text: "some history"))
 
-        // Mirrors ChatView's confirmation-dialog handler. newChat() derives ids from a
-        // millisecond timestamp, so back-to-back calls can land on the same id — assert
-        // on the resulting chat's freshness rather than id (in)equality.
-        model.deleteChat(oldId)
+        // Mirrors ChatView's trash-icon dialog handler for the "All" range. newChat()
+        // derives ids from a millisecond timestamp, so back-to-back calls can land on
+        // the same id — assert on the resulting chat's freshness rather than id (in)equality.
+        model.deleteChats(in: .all)
         model.newChat()
 
         #expect(model.chats.count == 1)

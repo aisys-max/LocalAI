@@ -96,17 +96,6 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .overlay(Rectangle().fill(theme.divider).frame(height: 1), alignment: .top)
                     }
-
-                    SectionLabel(model.strings.sectionDeleteConversations, theme: theme)
-                    GroupCard(theme: theme) {
-                        GroupRow(theme: theme, isFirst: true) {
-                            model.showDeleteRangeDialog = true
-                        } content: {
-                            Text(model.strings.deleteConversationsRowTitle)
-                                .foregroundColor(theme.destructive)
-                            Spacer()
-                        }
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -115,34 +104,6 @@ struct SettingsView: View {
         .background(theme.bg.ignoresSafeArea())
         .sheet(item: $model.legalOpenKey) { key in
             LegalSheetView(model: model, key: key, theme: theme)
-        }
-        .confirmationDialog(
-            model.strings.deleteRangeDialogTitle,
-            isPresented: $model.showDeleteRangeDialog,
-            titleVisibility: .visible
-        ) {
-            Button(model.strings.deleteRangeToday, role: .destructive) { model.deleteChats(in: .today) }
-            Button(model.strings.deleteRangeSinceYesterday, role: .destructive) { model.deleteChats(in: .sinceYesterday) }
-            Button(model.strings.deleteRangeThisWeek, role: .destructive) { model.deleteChats(in: .thisWeek) }
-            Button(model.strings.deleteRangeThisMonth, role: .destructive) { model.deleteChats(in: .thisMonth) }
-            Button(model.strings.deleteRangeAll, role: .destructive) { model.pendingDeleteRange = .all }
-        }
-        .alert(
-            model.strings.deleteAllConfirmTitle,
-            isPresented: Binding(
-                get: { model.pendingDeleteRange != nil },
-                set: { if !$0 { model.pendingDeleteRange = nil } }
-            )
-        ) {
-            Button(model.strings.cancel, role: .cancel) { model.pendingDeleteRange = nil }
-            Button(model.strings.delete, role: .destructive) {
-                if let range = model.pendingDeleteRange {
-                    model.deleteChats(in: range)
-                }
-                model.pendingDeleteRange = nil
-            }
-        } message: {
-            Text(model.strings.deleteAllConfirmMessage)
         }
     }
 

@@ -15,11 +15,6 @@ extension AppModel {
         screen = .chat
     }
 
-    func deleteChat(_ id: String) {
-        chats.removeValue(forKey: id)
-        if currentChatId == id { currentChatId = nil }
-    }
-
     func sendMessage() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !generating, let chatId = currentChatId, var chat = chats[chatId] else { return }
@@ -91,6 +86,12 @@ extension AppModel {
         chats[chatId] = chat
     }
 
+    func deleteMessage(chatId: String, messageId: String) {
+        guard var chat = chats[chatId] else { return }
+        chat.messages.removeAll { $0.id == messageId }
+        chats[chatId] = chat
+    }
+
     func copyMessage(id: String, text: String) {
         UIPasteboard.general.string = text
         copiedId = id
@@ -138,9 +139,9 @@ extension AppModel {
     }
 }
 
-/// The bucket a chat's `createdAt` falls into for Settings' range-based bulk
-/// delete — computed live at call time (not stored). `now`/`calendar` are
-/// injectable for deterministic tests.
+/// The bucket a chat's `createdAt` falls into for the range-based bulk
+/// delete (Chat View's trash icon) — computed live at call time (not
+/// stored). `now`/`calendar` are injectable for deterministic tests.
 func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> ChatDay {
     if calendar.isDate(date, inSameDayAs: now) { return .today }
     if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
@@ -149,8 +150,8 @@ func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .cur
     return .previous7
 }
 
-/// The 5 selectable ranges for Settings' bulk-delete — cumulative supersets,
-/// Today ⊆ Since Yesterday ⊆ This Week ⊆ This Month ⊆ All.
+/// The 5 selectable ranges for Chat View's trash-icon bulk-delete —
+/// cumulative supersets, Today ⊆ Since Yesterday ⊆ This Week ⊆ This Month ⊆ All.
 enum ChatDeleteRange: CaseIterable {
     case today, sinceYesterday, thisWeek, thisMonth, all
 }
