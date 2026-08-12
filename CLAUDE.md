@@ -24,10 +24,9 @@ LocalAI/                  # app target source root
   Views/                   # one subfolder per screen, mirroring the design's screen states
     Onboarding/
     Chat/                    # also owns MessageParsing.swift (markdown-lite renderer, presentation logic)
-    History/
     Settings/               # also owns LegalSheetView (opened from Settings' About section)
     ModelPicker/
-    Components/              # cross-screen reusable pieces only (segmented pill control, icon button, step header)
+    Components/              # cross-screen reusable pieces only (segmented pill control, icon button, step header, sub-header)
   Theme/
     Theme.swift              # color + font tokens, light/dark variants, ported from the design's styles.css
   Assets.xcassets/

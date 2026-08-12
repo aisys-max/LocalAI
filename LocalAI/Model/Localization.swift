@@ -32,11 +32,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 struct Strings {
     let appName: String
     let newChat: String
-    let historyTitle: String
     let settingsTitle: String
-    let today: String
-    let yesterday: String
-    let previous7: String
     let sectionModel: String
     let serverAddress: String
     let sectionAppearance: String
@@ -79,10 +75,18 @@ struct Strings {
     let replyErrorModelNotFound: String
     let replyErrorGeneric: String
     let delete: String
+    let deleteRangeToday: String
+    let deleteRangeSinceYesterday: String
+    let deleteRangeThisWeek: String
+    let deleteRangeThisMonth: String
+    let deleteRangeAll: String
+    let deleteRangeDialogTitle: String
+    let deleteAllConfirmTitle: String
+    let deleteAllConfirmMessage: String
+    let cancel: String
 
     static let en = Strings(
-        appName: "Local AI", newChat: "New chat", historyTitle: "History", settingsTitle: "Settings",
-        today: "Today", yesterday: "Yesterday", previous7: "Previous 7 Days",
+        appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
         sectionModel: "Model", serverAddress: "Server Address",
         sectionAppearance: "Appearance", sectionLanguage: "Language", sectionAbout: "About",
         light: "Light", dark: "Dark", system: "System",
@@ -110,12 +114,20 @@ struct Strings {
         replyErrorTimeout: "The request timed out. Check your connection and try again.",
         replyErrorModelNotFound: "This model isn't available on the server. Pick a different one in Settings.",
         replyErrorGeneric: "Something went wrong generating a reply. Please try again.",
-        delete: "Delete"
+        delete: "Delete",
+        deleteRangeToday: "Today",
+        deleteRangeSinceYesterday: "Since Yesterday",
+        deleteRangeThisWeek: "This Week",
+        deleteRangeThisMonth: "This Month",
+        deleteRangeAll: "All",
+        deleteRangeDialogTitle: "Delete conversations…",
+        deleteAllConfirmTitle: "Delete all conversations?",
+        deleteAllConfirmMessage: "This permanently deletes every conversation and can't be undone.",
+        cancel: "Cancel"
     )
 
     static let ko = Strings(
-        appName: "Local AI", newChat: "새 대화", historyTitle: "기록", settingsTitle: "설정",
-        today: "오늘", yesterday: "어제", previous7: "지난 7일",
+        appName: "Local AI", newChat: "새 대화", settingsTitle: "설정",
         sectionModel: "모델", serverAddress: "서버 주소",
         sectionAppearance: "화면 모드", sectionLanguage: "언어", sectionAbout: "정보",
         light: "라이트", dark: "다크", system: "시스템",
@@ -143,7 +155,16 @@ struct Strings {
         replyErrorTimeout: "요청 시간이 초과되었습니다. 연결 상태를 확인한 후 다시 시도하세요.",
         replyErrorModelNotFound: "이 서버에서 해당 모델을 찾을 수 없습니다. Settings에서 다른 모델을 선택하세요.",
         replyErrorGeneric: "응답을 생성하는 중 문제가 발생했습니다. 다시 시도해주세요.",
-        delete: "삭제"
+        delete: "삭제",
+        deleteRangeToday: "오늘",
+        deleteRangeSinceYesterday: "어제부터",
+        deleteRangeThisWeek: "이번주",
+        deleteRangeThisMonth: "이번달",
+        deleteRangeAll: "전체",
+        deleteRangeDialogTitle: "대화 삭제…",
+        deleteAllConfirmTitle: "모든 대화를 삭제할까요?",
+        deleteAllConfirmMessage: "모든 대화가 영구적으로 삭제되며 되돌릴 수 없습니다.",
+        cancel: "취소"
     )
 
     func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {

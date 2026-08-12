@@ -40,7 +40,7 @@ struct ChatMessage: Identifiable {
 
 struct Chat: Identifiable {
     let id: String
-    var day: ChatDay
+    var createdAt: Date
     var title: String
     var snippet: String
     var messages: [ChatMessage]

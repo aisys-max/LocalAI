@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 enum Screen {
-    case onboarding, chat, history, settings, modelPicker
+    case onboarding, chat, settings, modelPicker
 }
 
 enum AppearanceMode: String, CaseIterable, Identifiable {
@@ -45,6 +45,10 @@ final class AppModel: ObservableObject {
     @Published var draft: String = ""
     @Published var generating: Bool = false
     @Published var copiedId: String?
+    @Published var showDeleteRangeDialog: Bool = false
+    /// The range awaiting a second confirmation — only ever set to `.all`,
+    /// the sole range severe enough to need one beyond the dialog itself.
+    @Published var pendingDeleteRange: ChatDeleteRange?
 
     var copyResetTask: Task<Void, Never>?
     var modelLoadTask: Task<ModelListState, Never>?

@@ -83,99 +83,177 @@ import Foundation
         #expect(model.chats[chatId]?.messages.last?.text == "second reply")
     }
 
-    @Test func historyGroupsOrderTodayYesterdayPrevious7() {
-        let model = makeTestAppModel()
-        let groups = model.historyGroups
-        let days = groups.map(\.day)
-        #expect(days == days.sorted { a, b in
-            let order: [ChatDay: Int] = [.today: 0, .yesterday: 1, .previous7: 2]
-            return order[a]! < order[b]!
-        })
-    }
-
     @Test func copyMessageSetsCopiedId() {
         let model = makeTestAppModel()
         model.copyMessage(id: "m1", text: "some text")
         #expect(model.copiedId == "m1")
     }
 
-    @Test func deleteChatRemovesItFromChats() {
+    @Test func deleteMessageRemovesItFromTheChat() {
         let model = makeTestAppModel()
         model.newChat()
         let chatId = model.currentChatId!
+        let greetingId = model.chats[chatId]!.messages[0].id
 
-        model.deleteChat(chatId)
+        model.deleteMessage(chatId: chatId, messageId: greetingId)
 
-        #expect(model.chats[chatId] == nil)
+        #expect(model.chats[chatId]?.messages.contains { $0.id == greetingId } == false)
     }
 
-    @Test func deleteChatClearsCurrentChatIdWhenDeletingTheOpenChat() {
+    @Test func deleteMessageLeavesOtherMessagesInPlace() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "hello there"))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+        let greetingId = model.chats[chatId]!.messages[0].id
+
+        model.draft = "hi"
+        model.sendMessage()
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let userMessageId = model.chats[chatId]!.messages[1].id
+
+        model.deleteMessage(chatId: chatId, messageId: greetingId)
+
+        #expect(model.chats[chatId]?.messages.contains { $0.id == userMessageId } == true)
+    }
+
+    @Test func deleteMessageWithAnUnknownChatIdIsANoOp() {
         let model = makeTestAppModel()
         model.newChat()
         let chatId = model.currentChatId!
+        let messageCountBefore = model.chats[chatId]!.messages.count
 
-        model.deleteChat(chatId)
+        model.deleteMessage(chatId: "no-such-chat", messageId: "no-such-message")
+
+        #expect(model.chats[chatId]?.messages.count == messageCountBefore)
+    }
+
+    @Test func newChatSetsCreatedAtToNow() {
+        let model = makeTestAppModel()
+        model.newChat()
+        let chat = model.chats[model.currentChatId!]!
+        #expect(abs(chat.createdAt.timeIntervalSinceNow) < 1)
+    }
+
+    // MARK: - chatDayBucket
+
+    @Test func chatDayBucketReturnsTodayForATimestampEarlierTheSameDay() {
+        let now = DeleteRangeFixture.now
+        let earlierToday = DeleteRangeFixture.calendar.date(byAdding: .hour, value: -3, to: now)!
+        #expect(chatDayBucket(for: earlierToday, now: now, calendar: DeleteRangeFixture.calendar) == .today)
+    }
+
+    @Test func chatDayBucketReturnsYesterdayForATimestampYesterday() {
+        #expect(chatDayBucket(for: DeleteRangeFixture.yesterday, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .yesterday)
+    }
+
+    @Test func chatDayBucketReturnsPrevious7ForATimestampSeveralDaysAgo() {
+        #expect(chatDayBucket(for: DeleteRangeFixture.lastMonth, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .previous7)
+    }
+
+    @Test func chatDayBucketFlipsFromYesterdayToTodayOnceNowCrossesMidnight() {
+        // A timestamp at 23:59 stays "today" while `now` is still that same day...
+        let lateInTheDay = DeleteRangeFixture.calendar.date(byAdding: .minute, value: -1, to: DeleteRangeFixture.now)!
+        #expect(chatDayBucket(for: lateInTheDay, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar) == .today)
+        // ...but becomes "yesterday" once `now` has moved to the next calendar day.
+        let nextDay = DeleteRangeFixture.calendar.date(byAdding: .day, value: 1, to: DeleteRangeFixture.now)!
+        #expect(chatDayBucket(for: lateInTheDay, now: nextDay, calendar: DeleteRangeFixture.calendar) == .yesterday)
+    }
+
+    // MARK: - deleteChats(in:)
+
+    @Test func deleteChatsInTodayRemovesOnlyTodaysChatsAndLeavesOthers() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] != nil)
+        #expect(model.chats["thisWeekEarlier"] != nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInSinceYesterdayRemovesTodayAndYesterdayButNotOlder() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .sinceYesterday, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] != nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInThisWeekRemovesEverythingFromTheCurrentCalendarWeek() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .thisWeek, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] == nil)
+        #expect(model.chats["thisMonthEarlierWeek"] != nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInThisMonthRemovesEverythingFromTheCurrentCalendarMonthIncludingEarlierWeeksOfIt() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .thisMonth, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats["today"] == nil)
+        #expect(model.chats["yesterday"] == nil)
+        #expect(model.chats["thisWeekEarlier"] == nil)
+        #expect(model.chats["thisMonthEarlierWeek"] == nil)
+        #expect(model.chats["lastMonth"] != nil)
+    }
+
+    @Test func deleteChatsInAllRemovesEveryChatRegardlessOfCreatedAt() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.deleteChats(in: .all, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
+
+        #expect(model.chats.isEmpty)
+    }
+
+    @Test func deleteChatsInAllOnAnEmptyChatsDictionaryIsANoOp() {
+        let model = makeTestAppModel()
+        model.deleteChats(in: .all)
+        #expect(model.chats.isEmpty)
+    }
+
+    @Test func deleteChatsInRangeClearsCurrentChatIdWhenTheOpenChatFallsInRange() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.currentChatId = "today"
+
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
 
         #expect(model.currentChatId == nil)
     }
 
-    @Test func deleteChatLeavesCurrentChatIdUntouchedWhenDeletingADifferentChat() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let openChatId = model.currentChatId!
-        // A second chat with a distinct id — newChat() derives ids from a
-        // millisecond timestamp, so building this one by hand avoids a
-        // same-millisecond collision with openChatId in a fast test run.
-        let otherChatId = "other-chat"
-        model.chats[otherChatId] = model.chats[openChatId]
+    @Test func deleteChatsInRangeLeavesCurrentChatIdUntouchedWhenTheOpenChatIsOutsideRange() {
+        let model = DeleteRangeFixture.makeModelWithOneChatPerBucket()
+        model.currentChatId = "lastMonth"
 
-        model.deleteChat(otherChatId)
+        model.deleteChats(in: .today, now: DeleteRangeFixture.now, calendar: DeleteRangeFixture.calendar)
 
-        #expect(model.currentChatId == openChatId)
-        #expect(model.chats[otherChatId] == nil)
+        #expect(model.currentChatId == "lastMonth")
     }
 
-    @Test func previewExchangeBeforeAnyUserMessageIsJustTheGreeting() {
+    @Test func deletingAllChatsFollowedByNewChatLeavesExactlyOneFreshChat() {
         let model = makeTestAppModel()
         model.newChat()
-        let chat = model.chats[model.currentChatId!]!
+        let oldId = model.currentChatId!
+        model.chats[oldId]!.messages.append(ChatMessage(id: "extra", role: .user, text: "some history"))
 
-        let preview = chat.previewExchange
-        #expect(preview.user == nil)
-        #expect(preview.assistant?.isGreeting == true)
-    }
-
-    @Test func previewExchangeAfterSendingSkipsTheGreetingAndUsesTheFirstReply() async {
-        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "first reply"))
-        model.selectModel("test-model")
+        // Mirrors ChatView's trash-icon dialog handler for the "All" range. newChat()
+        // derives ids from a millisecond timestamp, so back-to-back calls can land on
+        // the same id — assert on the resulting chat's freshness rather than id (in)equality.
+        model.deleteChats(in: .all)
         model.newChat()
-        let chatId = model.currentChatId!
 
-        model.draft = "first question"
-        model.sendMessage()
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        model.draft = "second question"
-        model.sendMessage()
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        let preview = model.chats[chatId]!.previewExchange
-        #expect(preview.user?.text == "first question")
-        #expect(preview.assistant?.text == "first reply")
-    }
-
-    @Test func previewExchangeWithAUserMessageButNoReplyYetOmitsTheAssistantSide() {
-        let model = makeTestAppModel()
-        model.newChat()
-        let chatId = model.currentChatId!
-        // No Model selected — sendMessage() posts the user message but never
-        // calls the backend, so there's no reply to preview yet.
-        model.draft = "unanswered question"
-        model.sendMessage()
-
-        let preview = model.chats[chatId]!.previewExchange
-        #expect(preview.user?.text == "unanswered question")
-        #expect(preview.assistant == nil)
+        #expect(model.chats.count == 1)
+        #expect(model.currentChatId != nil)
+        let freshChat = model.chats[model.currentChatId!]!
+        #expect(freshChat.messages.count == 1)
+        #expect(freshChat.messages.first?.isGreeting == true)
     }
 
     @Test func upFrontStreamFailureAppendsAnInlineAssistantMessageAndClearsGenerating() async {
@@ -229,6 +307,51 @@ import Foundation
     }
 }
 
+/// Fixed, deterministic dates for range/bucketing tests — real wall-clock
+/// `Date()` would make week/month-boundary assertions flaky depending on
+/// when the test happens to run.
+private enum DeleteRangeFixture {
+    static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.firstWeekday = 1 // Sunday
+        return calendar
+    }()
+
+    /// Wednesday, June 12 2024, safely mid-week and mid-month.
+    static let now: Date = date(year: 2024, month: 6, day: 12, hour: 12)
+    /// Same week as `now` (week runs Sun June 9 – Sat June 15).
+    static let yesterday: Date = date(year: 2024, month: 6, day: 11, hour: 12)
+    static let thisWeekEarlier: Date = date(year: 2024, month: 6, day: 9, hour: 8)
+    /// Previous week (June 2–8), same month as `now`.
+    static let thisMonthEarlierWeek: Date = date(year: 2024, month: 6, day: 2, hour: 8)
+    /// A different month entirely.
+    static let lastMonth: Date = date(year: 2024, month: 5, day: 15, hour: 8)
+
+    static func date(year: Int, month: Int, day: Int, hour: Int) -> Date {
+        var components = DateComponents()
+        components.year = year; components.month = month; components.day = day; components.hour = hour
+        return calendar.date(from: components)!
+    }
+
+    static func makeChat(id: String, createdAt: Date) -> Chat {
+        Chat(id: id, createdAt: createdAt, title: "title", snippet: "snippet", messages: [])
+    }
+
+    @MainActor
+    static func makeModelWithOneChatPerBucket() -> AppModel {
+        let model = makeTestAppModel()
+        model.chats = [
+            "today": makeChat(id: "today", createdAt: now),
+            "yesterday": makeChat(id: "yesterday", createdAt: yesterday),
+            "thisWeekEarlier": makeChat(id: "thisWeekEarlier", createdAt: thisWeekEarlier),
+            "thisMonthEarlierWeek": makeChat(id: "thisMonthEarlierWeek", createdAt: thisMonthEarlierWeek),
+            "lastMonth": makeChat(id: "lastMonth", createdAt: lastMonth),
+        ]
+        model.currentChatId = nil
+        return model
+    }
+}
+
 @MainActor
 @Suite struct AppModelNavigationTests {
     @Test func modelPickerRoundTripsBackToItsOrigin() {
@@ -241,10 +364,8 @@ import Foundation
         }
     }
 
-    @Test func goHistorySettingsChatUpdateScreen() {
+    @Test func goSettingsChatUpdateScreen() {
         let model = makeTestAppModel()
-        model.goHistory()
-        #expect(model.screen == .history)
         model.goSettings()
         #expect(model.screen == .settings)
         model.goChat()

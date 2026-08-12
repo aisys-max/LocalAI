@@ -6,23 +6,13 @@ extension AppModel {
         let id = "c\(Int(Date().timeIntervalSince1970 * 1000))"
         let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
         let chat = Chat(
-            id: id, day: .today, title: strings.newChat,
+            id: id, createdAt: Date(), title: strings.newChat,
             snippet: String(greeting.prefix(60)),
             messages: [ChatMessage(id: id + "-g", role: .assistant, text: greeting, model: model, isGreeting: true)]
         )
         chats[id] = chat
         currentChatId = id
         screen = .chat
-    }
-
-    func openChat(_ id: String) {
-        currentChatId = id
-        screen = .chat
-    }
-
-    func deleteChat(_ id: String) {
-        chats.removeValue(forKey: id)
-        if currentChatId == id { currentChatId = nil }
     }
 
     func sendMessage() {
@@ -107,6 +97,12 @@ extension AppModel {
         chats[chatId] = chat
     }
 
+    func deleteMessage(chatId: String, messageId: String) {
+        guard var chat = chats[chatId] else { return }
+        chat.messages.removeAll { $0.id == messageId }
+        chats[chatId] = chat
+    }
+
     func copyMessage(id: String, text: String) {
         UIPasteboard.general.string = text
         copiedId = id
@@ -123,29 +119,50 @@ extension AppModel {
         currentChatId.flatMap { chats[$0] }
     }
 
-    /// Chats grouped by day, ordered today → yesterday → previous7, each newest-first —
-    /// mirrors the design's `historyGroups`.
-    var historyGroups: [(day: ChatDay, label: String, chats: [Chat])] {
-        let order: [ChatDay] = [.today, .yesterday, .previous7]
-        let labels: [ChatDay: String] = [.today: strings.today, .yesterday: strings.yesterday, .previous7: strings.previous7]
-        return order.compactMap { day in
-            let dayChats = chats.values.filter { $0.day == day }
-            guard !dayChats.isEmpty else { return nil }
-            return (day, labels[day]!, dayChats.sorted { $0.id > $1.id })
+    func deleteChats(in range: ChatDeleteRange, now: Date = Date(), calendar: Calendar = .current) {
+        let idsToDelete = chats.values
+            .filter { isChat($0, in: range, now: now, calendar: calendar) }
+            .map(\.id)
+        for id in idsToDelete {
+            chats.removeValue(forKey: id)
+        }
+        if let currentChatId, !chats.keys.contains(currentChatId) {
+            self.currentChatId = nil
+        }
+    }
+
+    private func isChat(_ chat: Chat, in range: ChatDeleteRange, now: Date, calendar: Calendar) -> Bool {
+        switch range {
+        case .today:
+            return chatDayBucket(for: chat.createdAt, now: now, calendar: calendar) == .today
+        case .sinceYesterday:
+            let bucket = chatDayBucket(for: chat.createdAt, now: now, calendar: calendar)
+            return bucket == .today || bucket == .yesterday
+        case .thisWeek:
+            return isChat(chat, in: .sinceYesterday, now: now, calendar: calendar)
+                || calendar.isDate(chat.createdAt, equalTo: now, toGranularity: .weekOfYear)
+        case .thisMonth:
+            return isChat(chat, in: .thisWeek, now: now, calendar: calendar)
+                || calendar.isDate(chat.createdAt, equalTo: now, toGranularity: .month)
+        case .all:
+            return true
         }
     }
 }
 
-extension Chat {
-    /// The first exchange in the chat — the User's first message (if they've
-    /// sent one yet) and the Assistant reply that answered it, skipping the
-    /// opening greeting — used for the History preview card.
-    var previewExchange: (user: ChatMessage?, assistant: ChatMessage?) {
-        guard let userIndex = messages.firstIndex(where: { $0.role == .user }) else {
-            return (nil, messages.first(where: { $0.role == .assistant }))
-        }
-        let user = messages[userIndex]
-        let assistant = messages[(userIndex + 1)...].first(where: { $0.role == .assistant })
-        return (user, assistant)
+/// The bucket a chat's `createdAt` falls into for the range-based bulk
+/// delete (Chat View's trash icon) — computed live at call time (not
+/// stored). `now`/`calendar` are injectable for deterministic tests.
+func chatDayBucket(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> ChatDay {
+    if calendar.isDate(date, inSameDayAs: now) { return .today }
+    if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
+        return .yesterday
     }
+    return .previous7
+}
+
+/// The 5 selectable ranges for Chat View's trash-icon bulk-delete —
+/// cumulative supersets, Today ⊆ Since Yesterday ⊆ This Week ⊆ This Month ⊆ All.
+enum ChatDeleteRange: CaseIterable {
+    case today, sinceYesterday, thisWeek, thisMonth, all
 }
