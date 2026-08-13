@@ -1,7 +1,7 @@
 import Testing
 @testable import LocalAI
 
-@Suite struct MessageParsingTests {
+struct MessageParsingTests {
     @Test func plainTextProducesASingleUnboldedTextBlock() {
         let blocks = MessageParsing.blocks(from: "just plain text")
         #expect(blocks.count == 1)

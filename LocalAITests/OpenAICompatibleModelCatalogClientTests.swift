@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import LocalAI
 
-@Suite struct OpenAICompatibleModelCatalogClientTests {
+struct OpenAICompatibleModelCatalogClientTests {
     private let testBaseURL = URL(string: "http://localhost:11434")!
 
     @Test func requestIsAGetToVModels() async throws {

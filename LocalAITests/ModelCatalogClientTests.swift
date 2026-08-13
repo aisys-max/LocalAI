@@ -2,11 +2,11 @@ import Testing
 import Foundation
 @testable import LocalAI
 
-@Suite struct ModelCatalogClientTests {
+struct ModelCatalogClientTests {
     @Test func simulatedCatalogReturnsANonEmptyFixedList() async throws {
         let client = SimulatedModelCatalogClient()
         let models = try await client.fetchModels(baseURL: URL(string: "http://localhost:11434")!)
-        #expect(!models.isEmpty)
+        #expect(models.isEmpty == false)
     }
 
     @Test func simulatedCatalogIsConsistentAcrossRepeatedCalls() async throws {

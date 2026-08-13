@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import LocalAI
 
-@Suite struct ChatReplyFailureTests {
+struct ChatReplyFailureTests {
     @Test func urlErrorsThatMeanTheServerIsUnreachableClassifyAsUnreachable() {
         for code: URLError.Code in [.notConnectedToInternet, .cannotConnectToHost, .cannotFindHost, .networkConnectionLost, .dnsLookupFailed] {
             #expect(classifyChatReplyFailure(URLError(code)) == .unreachable)
