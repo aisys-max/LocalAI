@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import LocalAI
 
-@Suite struct OpenAICompatibleChatBackendClientTests {
+struct OpenAICompatibleChatBackendClientTests {
     private let testBaseURL = URL(string: "http://localhost:11434")!
 
     @Test func requestHitsChatCompletionsEndpointWithModelAndMessages() async throws {

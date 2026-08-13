@@ -3,7 +3,7 @@ import Foundation
 @testable import LocalAI
 
 @MainActor
-@Suite struct AppModelChatTests {
+struct AppModelChatTests {
     @Test func sendMessageAppendsUserMessageImmediatelyThenAssistantReply() async {
         let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "hello there"))
         model.selectModel("test-model")
@@ -11,13 +11,13 @@ import Foundation
         let chatId = model.currentChatId!
 
         model.draft = "hi"
-        model.sendMessage()
+        let task = model.sendMessage()
 
         #expect(model.chats[chatId]?.messages.last?.role == .user)
         #expect(model.generating == true)
         #expect(model.draft == "")
 
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await task?.value
 
         #expect(model.generating == false)
         #expect(model.chats[chatId]?.messages.last?.text == "hello there")
@@ -30,9 +30,7 @@ import Foundation
         let chatId = model.currentChatId!
 
         model.draft = "hi"
-        model.sendMessage()
-
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await model.sendMessage()?.value
 
         #expect(model.generating == false)
         #expect(model.chats[chatId]?.messages.last?.text == "hello there")
@@ -72,12 +70,12 @@ import Foundation
         let chatId = model.currentChatId!
         let greetingId = model.chats[chatId]!.messages[0].id
 
-        model.regenerate(chatId: chatId, messageId: greetingId)
+        let task = model.regenerate(chatId: chatId, messageId: greetingId)
 
         #expect(model.chats[chatId]?.messages.contains { $0.id == greetingId } == false)
         #expect(model.generating == true)
 
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await task?.value
 
         #expect(model.generating == false)
         #expect(model.chats[chatId]?.messages.last?.text == "second reply")
@@ -108,8 +106,7 @@ import Foundation
         let greetingId = model.chats[chatId]!.messages[0].id
 
         model.draft = "hi"
-        model.sendMessage()
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await model.sendMessage()?.value
         let userMessageId = model.chats[chatId]!.messages[1].id
 
         model.deleteMessage(chatId: chatId, messageId: greetingId)
@@ -263,10 +260,10 @@ import Foundation
         let chatId = model.currentChatId!
 
         model.draft = "hi"
-        model.sendMessage()
+        let task = model.sendMessage()
         #expect(model.generating == true)
 
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await task?.value
 
         #expect(model.generating == false)
         #expect(model.chats[chatId]?.messages.last?.role == .assistant)
@@ -280,9 +277,7 @@ import Foundation
         let chatId = model.currentChatId!
 
         model.draft = "hi"
-        model.sendMessage()
-
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await model.sendMessage()?.value
 
         #expect(model.generating == false)
         let messages = model.chats[chatId]?.messages ?? []
@@ -299,9 +294,7 @@ import Foundation
         let chatId = model.currentChatId!
 
         model.draft = "hi"
-        model.sendMessage()
-
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await model.sendMessage()?.value
 
         #expect(model.chats[chatId]?.messages.last?.text == model.strings.replyErrorModelNotFound)
     }
@@ -353,7 +346,7 @@ private enum DeleteRangeFixture {
 }
 
 @MainActor
-@Suite struct AppModelNavigationTests {
+struct AppModelNavigationTests {
     @Test func modelPickerRoundTripsBackToItsOrigin() {
         for origin: Screen in [.settings, .onboarding, .chat] {
             let model = makeTestAppModel()
@@ -382,7 +375,7 @@ private enum DeleteRangeFixture {
 }
 
 @MainActor
-@Suite struct AppModelSettingsTests {
+struct AppModelSettingsTests {
     @Test func selectModelUpdatesModel() {
         let model = makeTestAppModel()
         model.selectModel("Some Model")
@@ -438,7 +431,7 @@ private enum DeleteRangeFixture {
 }
 
 @MainActor
-@Suite struct AppModelModelsTests {
+struct AppModelModelsTests {
     @Test func initTriggersAnInitialLoadThatAutoSelectsTheFirstModel() async {
         let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1", "m2"]))
         #expect(model.model == nil)
@@ -686,7 +679,7 @@ private enum DeleteRangeFixture {
 }
 
 @MainActor
-@Suite struct AppModelOnboardingTests {
+struct AppModelOnboardingTests {
     @Test func onboardingBackClampsAtZero() {
         let model = makeTestAppModel()
         model.onboardingBack()
