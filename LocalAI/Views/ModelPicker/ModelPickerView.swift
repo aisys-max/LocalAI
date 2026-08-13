@@ -6,7 +6,7 @@ struct ModelPickerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SubHeader(title: model.strings.modelPickerTitle, theme: theme, onBack: { model.closeModelPicker() })
+            SubHeader(title: model.strings.modelPickerTitle, theme: theme, backLabel: model.strings.back, onBack: { model.closeModelPicker() })
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {

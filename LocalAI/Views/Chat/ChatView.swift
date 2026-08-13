@@ -11,24 +11,39 @@ struct ChatView: View {
                     Spacer()
                     Text(model.strings.appName)
                         .font(AppFont.heading(17))
-                        .foregroundColor(theme.text)
+                        .foregroundStyle(theme.text)
                     Spacer()
-                    IconButtonView(systemName: "trash", theme: theme) {
+                    IconButtonView(title: model.strings.deleteConversations, systemName: "trash", theme: theme) {
                         model.showDeleteRangeDialog = true
                     }
-                    IconButtonView(systemName: "gearshape", theme: theme) {
+                    .confirmationDialog(
+                        model.strings.deleteRangeDialogTitle,
+                        isPresented: $model.showDeleteRangeDialog,
+                        titleVisibility: .visible
+                    ) {
+                        Button(model.strings.deleteRangeToday, role: .destructive) { deleteChatsAndStartFresh(in: .today) }
+                        Button(model.strings.deleteRangeSinceYesterday, role: .destructive) { deleteChatsAndStartFresh(in: .sinceYesterday) }
+                        Button(model.strings.deleteRangeThisWeek, role: .destructive) { deleteChatsAndStartFresh(in: .thisWeek) }
+                        Button(model.strings.deleteRangeThisMonth, role: .destructive) { deleteChatsAndStartFresh(in: .thisMonth) }
+                        Button(model.strings.deleteRangeAll, role: .destructive) { model.showDeleteAllConfirmation = true }
+                    }
+                    IconButtonView(title: model.strings.settingsTitle, systemName: "gearshape", theme: theme) {
                         model.goSettings()
                     }
                 }
                 .padding(.horizontal, 14)
 
-                Text("\(model.model ?? model.strings.noModelSelected) · \(model.backend.label)")
-                    .font(AppFont.body(11.5, weight: .semibold))
-                    .foregroundColor(theme.textMuted)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(theme.surface2))
-                    .onTapGesture { model.openModelPicker(from: .chat) }
+                Button {
+                    model.openModelPicker(from: .chat)
+                } label: {
+                    Text("\(model.model ?? model.strings.noModelSelected) · \(model.backend.label)")
+                        .font(AppFont.body(11.5, weight: .semibold))
+                        .foregroundStyle(theme.textMuted)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(theme.surface2))
+                }
+                .buttonStyle(.plain)
             }
             .padding(.top, 20)
             .padding(.bottom, 10)
@@ -81,30 +96,13 @@ struct ChatView: View {
             InputBarView(model: model, theme: theme)
         }
         .background(theme.bg.ignoresSafeArea())
-        .confirmationDialog(
-            model.strings.deleteRangeDialogTitle,
-            isPresented: $model.showDeleteRangeDialog,
-            titleVisibility: .visible
-        ) {
-            Button(model.strings.deleteRangeToday, role: .destructive) { deleteChatsAndStartFresh(in: .today) }
-            Button(model.strings.deleteRangeSinceYesterday, role: .destructive) { deleteChatsAndStartFresh(in: .sinceYesterday) }
-            Button(model.strings.deleteRangeThisWeek, role: .destructive) { deleteChatsAndStartFresh(in: .thisWeek) }
-            Button(model.strings.deleteRangeThisMonth, role: .destructive) { deleteChatsAndStartFresh(in: .thisMonth) }
-            Button(model.strings.deleteRangeAll, role: .destructive) { model.pendingDeleteRange = .all }
-        }
         .alert(
             model.strings.deleteAllConfirmTitle,
-            isPresented: Binding(
-                get: { model.pendingDeleteRange != nil },
-                set: { if !$0 { model.pendingDeleteRange = nil } }
-            )
+            isPresented: $model.showDeleteAllConfirmation
         ) {
-            Button(model.strings.cancel, role: .cancel) { model.pendingDeleteRange = nil }
+            Button(model.strings.cancel, role: .cancel) { }
             Button(model.strings.delete, role: .destructive) {
-                if let range = model.pendingDeleteRange {
-                    deleteChatsAndStartFresh(in: range)
-                }
-                model.pendingDeleteRange = nil
+                deleteChatsAndStartFresh(in: .all)
             }
         } message: {
             Text(model.strings.deleteAllConfirmMessage)

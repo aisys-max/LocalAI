@@ -84,6 +84,8 @@ struct Strings {
     let deleteAllConfirmTitle: String
     let deleteAllConfirmMessage: String
     let cancel: String
+    let back: String
+    let deleteConversations: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
@@ -123,7 +125,9 @@ struct Strings {
         deleteRangeDialogTitle: "Delete conversations…",
         deleteAllConfirmTitle: "Delete all conversations?",
         deleteAllConfirmMessage: "This permanently deletes every conversation and can't be undone.",
-        cancel: "Cancel"
+        cancel: "Cancel",
+        back: "Back",
+        deleteConversations: "Delete Conversations"
     )
 
     static let ko = Strings(
@@ -164,7 +168,9 @@ struct Strings {
         deleteRangeDialogTitle: "대화 삭제…",
         deleteAllConfirmTitle: "모든 대화를 삭제할까요?",
         deleteAllConfirmMessage: "모든 대화가 영구적으로 삭제되며 되돌릴 수 없습니다.",
-        cancel: "취소"
+        cancel: "취소",
+        back: "뒤로",
+        deleteConversations: "대화 삭제"
     )
 
     func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {

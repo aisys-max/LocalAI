@@ -6,7 +6,7 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SubHeader(title: model.strings.settingsTitle, theme: theme, onBack: { model.goChat() })
+            SubHeader(title: model.strings.settingsTitle, theme: theme, backLabel: model.strings.back, onBack: { model.goChat() })
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {

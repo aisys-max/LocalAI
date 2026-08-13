@@ -11,7 +11,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             HStack {
                 if model.onboardingStep > 0 {
-                    IconButtonView(systemName: "chevron.left", theme: theme) {
+                    IconButtonView(title: model.strings.back, systemName: "chevron.left", theme: theme) {
                         model.onboardingBack()
                     }
                 }
