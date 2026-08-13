@@ -46,9 +46,9 @@ final class AppModel: ObservableObject {
     @Published var generating: Bool = false
     @Published var copiedId: String?
     @Published var showDeleteRangeDialog: Bool = false
-    /// The range awaiting a second confirmation — only ever set to `.all`,
-    /// the sole range severe enough to need one beyond the dialog itself.
-    @Published var pendingDeleteRange: ChatDeleteRange?
+    /// Second confirmation shown only for `.all` — the sole range severe
+    /// enough to need one beyond the dialog itself.
+    @Published var showDeleteAllConfirmation: Bool = false
 
     var copyResetTask: Task<Void, Never>?
     var modelLoadTask: Task<ModelListState, Never>?
