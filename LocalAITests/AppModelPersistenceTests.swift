@@ -429,4 +429,85 @@ struct AppModelPersistenceTests {
 
         #expect(model.chats["c1"] == nil)
     }
+
+    @Test func resetToDefaultClearsEveryChatAndPersistsTheDeletions() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": makeAgedChat(id: "c1", daysAgo: 0, now: now),
+            "c2": makeAgedChat(id: "c2", daysAgo: 0, now: now)
+        ]
+        store.currentChatId = "c1"
+        let model = makeTestAppModel(persistenceStore: store)
+
+        model.resetToDefault()
+
+        #expect(model.chats.isEmpty)
+        #expect(store.chats.isEmpty)
+        #expect(model.currentChatId == nil)
+    }
+
+    @Test func resetToDefaultClearsTheDraft() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.draft = "half-typed message"
+
+        model.resetToDefault()
+
+        #expect(model.draft == "")
+        #expect(store.draft == "")
+    }
+
+    @Test func resetToDefaultResetsEverySettingToItsDefaultAndPersistsIt() {
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(
+            backend: .lmstudio, model: "custom-model",
+            backendServerAddresses: [.lmstudio: "http://custom:1234"],
+            appearance: .dark, language: .ko, retentionPeriod: .sixMonths
+        )
+        let model = makeTestAppModel(persistenceStore: store)
+
+        model.resetToDefault()
+
+        #expect(model.backend == PersistedSettings.default.backend)
+        #expect(model.model == PersistedSettings.default.model)
+        #expect(model.backendServerAddresses == PersistedSettings.default.backendServerAddresses)
+        #expect(model.appearance == PersistedSettings.default.appearance)
+        #expect(model.language == PersistedSettings.default.language)
+        #expect(model.retentionPeriod == PersistedSettings.default.retentionPeriod)
+        #expect(store.settings.backend == PersistedSettings.default.backend)
+        #expect(store.settings.retentionPeriod == PersistedSettings.default.retentionPeriod)
+    }
+
+    @Test func resetToDefaultResetsOnboardingAndReturnsToOnboardingScreen() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.onboardingStep = 2
+        model.screen = .settings
+
+        model.resetToDefault()
+
+        #expect(model.onboardingStep == 0)
+        #expect(model.screen == .onboarding)
+    }
+
+    @Test func resetToDefaultStopsInFlightModelWorkAndClearsStaleState() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(shouldFail: true), persistenceStore: store)
+        model.startModelRetryLoop()
+        #expect(model.modelRetryLoopTask != nil)
+
+        model.resetToDefault()
+
+        // The retry loop (and any bare in-flight fetch) must be stopped —
+        // otherwise a fetch for the *old* Backend could resolve after the
+        // reset and silently re-persist a non-default Model.
+        #expect(model.modelRetryLoopTask == nil)
+        #expect(model.isRetryingModels == false)
+        #expect(model.modelListState == .loading)
+        #expect(model.modelPendingValidation == nil)
+        #expect(model.generating == false)
+        #expect(model.copiedId == nil)
+        #expect(model.legalOpenKey == nil)
+    }
 }
