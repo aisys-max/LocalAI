@@ -110,22 +110,13 @@ struct SettingsView: View {
 
                     GroupCard(theme: theme) {
                         GroupRow(theme: theme, isFirst: true) {
-                            model.showResetToDefaultDialog = true
+                            model.showResetToDefaultConfirmation = true
                         } content: {
                             Text(model.strings.resetToDefault)
                                 .foregroundColor(.red)
                         }
                     }
                     .padding(.top, 18)
-                    .confirmationDialog(
-                        model.strings.resetToDefault,
-                        isPresented: $model.showResetToDefaultDialog,
-                        titleVisibility: .visible
-                    ) {
-                        Button(model.strings.resetToDefault, role: .destructive) {
-                            model.showResetToDefaultConfirmation = true
-                        }
-                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)

@@ -36,11 +36,6 @@ final class AppModel: ObservableObject {
     @Published var language: AppLanguage = .en
     @Published var backendServerAddresses: [Backend: String] = [:]
     @Published var retentionPeriod: RetentionPeriod = .oneMonth
-    /// Step 1 of the two-step Reset to Default confirmation (mirrors
-    /// `showDeleteRangeDialog`/`showDeleteAllConfirmation`'s shape below) —
-    /// a `confirmationDialog` with the single destructive option, which on
-    /// selection opens `showResetToDefaultConfirmation` (step 2).
-    @Published var showResetToDefaultDialog: Bool = false
     @Published var showResetToDefaultConfirmation: Bool = false
 
     // MARK: - Onboarding (AppModel+Onboarding.swift)
