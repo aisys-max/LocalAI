@@ -37,7 +37,7 @@ The synthetic first assistant ChatMessage a new Chat opens with (`ChatMessage.is
 _Avoid_: Welcome message, intro message.
 
 **Retention Period**:
-A user-chosen Settings option (1 week / 1 month / 6 months) controlling how long a Chat is kept before automatic expiry. Enforced at Chat granularity by `Chat.createdAt`, the same granularity as the existing manual bulk-delete ranges — never a partial, per-message trim. Checked once per app launch.
+A user-chosen Settings option (1 week / 1 month / 6 months) controlling how long a Chat is kept before automatic expiry. Enforced at Chat granularity by `Chat.createdAt`, the same granularity as the existing manual bulk-delete ranges — never a partial, per-message trim. Checked once per app launch, and immediately whenever the period is shortened in Settings — lengthening it never resurrects an already-pruned Chat.
 _Avoid_: Retention policy, TTL (internal-implementation terms; use Retention Period in user-facing/Settings contexts).
 
 **Reset to Default**:

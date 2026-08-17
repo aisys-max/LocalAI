@@ -365,6 +365,38 @@ private enum DeleteRangeFixture {
     }
 }
 
+struct RetentionPeriodTests {
+    private let calendar = DeleteRangeFixture.calendar
+    private let now = DeleteRangeFixture.now
+
+    @Test func oneWeekCutoffExcludesAChatFromEightDaysAgo() {
+        let cutoff = RetentionPeriod.oneWeek.cutoffDate(now: now, calendar: calendar)
+        let eightDaysAgo = calendar.date(byAdding: .day, value: -8, to: now)!
+        let sixDaysAgo = calendar.date(byAdding: .day, value: -6, to: now)!
+
+        #expect(eightDaysAgo < cutoff)
+        #expect(sixDaysAgo > cutoff)
+    }
+
+    @Test func oneMonthCutoffExcludesAChatFromTwoMonthsAgo() {
+        let cutoff = RetentionPeriod.oneMonth.cutoffDate(now: now, calendar: calendar)
+        let twoMonthsAgo = calendar.date(byAdding: .month, value: -2, to: now)!
+        let twoWeeksAgo = calendar.date(byAdding: .day, value: -14, to: now)!
+
+        #expect(twoMonthsAgo < cutoff)
+        #expect(twoWeeksAgo > cutoff)
+    }
+
+    @Test func sixMonthCutoffExcludesAChatFromAYearAgo() {
+        let cutoff = RetentionPeriod.sixMonths.cutoffDate(now: now, calendar: calendar)
+        let aYearAgo = calendar.date(byAdding: .year, value: -1, to: now)!
+        let twoMonthsAgo = calendar.date(byAdding: .month, value: -2, to: now)!
+
+        #expect(aYearAgo < cutoff)
+        #expect(twoMonthsAgo > cutoff)
+    }
+}
+
 @MainActor
 struct AppModelNavigationTests {
     @Test func modelPickerRoundTripsBackToItsOrigin() {
