@@ -61,6 +61,8 @@ struct Strings {
     let regenerate: String
     let ollamaDesc: String
     let lmstudioDesc: String
+    let ollamaRemoteHint: String
+    let lmstudioRemoteHint: String
     let inputPlaceholder: String
     let loadingModels: String
     let modelLoadError: String
@@ -111,6 +113,8 @@ struct Strings {
         getStarted: "Get Started", copy: "Copy", copied: "Copied", regenerate: "Regenerate",
         ollamaDesc: "Connects to a local Ollama server (localhost:11434).",
         lmstudioDesc: "Connects to a local LM Studio server (OpenAI-compatible API).",
+        ollamaRemoteHint: "For remote access, install Tailscale and enter your Ollama machine's Tailscale address here.",
+        lmstudioRemoteHint: "For remote access, use LM Studio's LM Link (lmstudio.ai/link), or enter a Tailscale address here.",
         inputPlaceholder: "Message Local AI…",
         loadingModels: "Loading models…",
         modelLoadError: "Couldn't load models from this server.",
@@ -162,6 +166,8 @@ struct Strings {
         getStarted: "시작하기", copy: "복사", copied: "복사됨", regenerate: "다시 생성",
         ollamaDesc: "로컬 Ollama 서버(localhost:11434)에 연결됩니다.",
         lmstudioDesc: "로컬 LM Studio 서버(OpenAI 호환 API)에 연결됩니다.",
+        ollamaRemoteHint: "원격 접속을 하려면 Tailscale을 설치하고, Ollama 기기의 Tailscale 주소를 여기에 입력하세요.",
+        lmstudioRemoteHint: "원격 접속을 하려면 LM Studio의 LM Link(lmstudio.ai/link)를 사용하거나, Tailscale 주소를 여기에 입력하세요.",
         inputPlaceholder: "Local AI에게 메시지 보내기…",
         loadingModels: "모델을 불러오는 중…",
         modelLoadError: "이 서버에서 모델 목록을 가져오지 못했습니다.",

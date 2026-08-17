@@ -51,6 +51,12 @@ struct SettingsView: View {
                             #endif
                             .padding(.horizontal, 16)
                             .padding(.vertical, 13)
+
+                        Text(model.backend.remoteAccessHint(model.language))
+                            .font(AppFont.body(12))
+                            .foregroundColor(theme.textMuted)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 13)
                     }
 
                     SectionLabel(model.strings.sectionAppearance, theme: theme)
