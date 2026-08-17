@@ -100,6 +100,37 @@ final class DelayedModelCatalogClient: ModelCatalogClient {
     }
 }
 
+/// In-memory `PersistenceStore` fake. Reference type so a test can hold onto
+/// the same instance passed into `AppModel.init` to pre-seed state (testing
+/// load-on-launch) or inspect what was saved after a mutation.
+final class FakePersistenceStore: PersistenceStore {
+    var chats: [String: Chat] = [:]
+    var currentChatId: String?
+    var draft: String = ""
+    private(set) var saveChatCallCount = 0
+
+    func loadChats() -> [String: Chat] { chats }
+    func loadCurrentChatId() -> String? { currentChatId }
+    func loadDraft() -> String { draft }
+
+    func saveChat(_ chat: Chat) {
+        chats[chat.id] = chat
+        saveChatCallCount += 1
+    }
+
+    func deleteChat(id: String) {
+        chats.removeValue(forKey: id)
+    }
+
+    func saveCurrentChatId(_ currentChatId: String?) {
+        self.currentChatId = currentChatId
+    }
+
+    func saveDraft(_ draft: String) {
+        self.draft = draft
+    }
+}
+
 /// Builds an `AppModel` wired with fakes by default, so tests never trigger
 /// a real network call (e.g. via `AppModel.init`'s automatic initial model
 /// load) unless they explicitly ask for one. The timeout/retry-backoff
@@ -109,12 +140,14 @@ final class DelayedModelCatalogClient: ModelCatalogClient {
 func makeTestAppModel(
     backendClient: ChatBackendClient = FakeChatBackendClient(),
     modelCatalogClient: ModelCatalogClient = FakeModelCatalogClient(),
+    persistenceStore: PersistenceStore = FakePersistenceStore(),
     modelFetchTimeoutNanoseconds: UInt64 = 30_000_000,
     modelRetryBackoffNanoseconds: UInt64 = 10_000_000
 ) -> AppModel {
     AppModel(
         backendClient: backendClient,
         modelCatalogClient: modelCatalogClient,
+        persistenceStore: persistenceStore,
         modelFetchTimeoutNanoseconds: modelFetchTimeoutNanoseconds,
         modelRetryBackoffNanoseconds: modelRetryBackoffNanoseconds
     )

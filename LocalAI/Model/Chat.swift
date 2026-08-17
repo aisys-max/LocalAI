@@ -4,7 +4,7 @@ enum ChatDay: String {
     case today, yesterday, previous7
 }
 
-enum MessageRole {
+enum MessageRole: String {
     case user, assistant
 }
 
@@ -34,8 +34,12 @@ struct ChatMessage: Identifiable {
     /// The synthetic "hi" message a new chat opens with — unlike a real
     /// generated reply, it isn't tied to whatever Engine/Model produced it,
     /// so it's re-rendered against the live Engine/Model instead of the
-    /// snapshot captured when the chat was created.
+    /// snapshot captured when the chat was created. Never persisted —
+    /// synthesized fresh each time a Chat is loaded/displayed.
     var isGreeting: Bool = false
+    /// Orders Messages within a Chat after a save/reload round-trip — `id`
+    /// alone isn't sortable (assistant message ids are random UUIDs).
+    var createdAt: Date = Date()
 }
 
 struct Chat: Identifiable {

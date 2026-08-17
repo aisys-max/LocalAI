@@ -2,15 +2,58 @@ import Foundation
 import UIKit
 
 extension AppModel {
+    /// The synthetic greeting Message a Chat opens with, worded against
+    /// whichever Backend/Model is *currently* selected — used both when
+    /// starting a new Chat and when restoring a loaded Chat's greeting
+    /// (never persisted; see `restoreGreetings()`).
+    func greetingMessage(forChatId chatId: String, createdAt: Date) -> ChatMessage {
+        let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
+        return ChatMessage(id: chatId + "-g", role: .assistant, text: greeting, model: model, isGreeting: true, createdAt: createdAt)
+    }
+
+    /// Re-inserts a fresh greeting Message as the first Message of every
+    /// loaded Chat — greetings are never persisted (`persistChat(_:)`
+    /// strips them before saving), so a Chat loaded from storage needs one
+    /// synthesized back in. Called once at launch, before any UI reads
+    /// `chats`.
+    func restoreGreetings() {
+        for (id, chat) in chats {
+            var restored = chat
+            let realMessages = chat.messages.filter { !$0.isGreeting }.sorted { $0.createdAt < $1.createdAt }
+            restored.messages = [greetingMessage(forChatId: id, createdAt: chat.createdAt)] + realMessages
+            chats[id] = restored
+        }
+    }
+
+    /// Saves one Chat (by id) to the persistence store — scoped to just
+    /// that Chat, not a whole-store rewrite — stripping its Greeting
+    /// Message first (synthesized fresh on load, never stored). Called at
+    /// well-defined mutation points — never per streamed chunk, so an
+    /// interrupted in-flight Generation never leaves a partial assistant
+    /// Message on disk. No-op if `chatId` isn't in `chats` (e.g. already
+    /// deleted — see `deleteChats(in:)`, which uses `deleteChat(id:)` instead).
+    func persistChat(_ chatId: String) {
+        guard let chat = chats[chatId] else { return }
+        var sanitized = chat
+        sanitized.messages = chat.messages.filter { !$0.isGreeting }
+        persistenceStore.saveChat(sanitized)
+    }
+
     func newChat() {
         let id = "c\(Int(Date().timeIntervalSince1970 * 1000))"
-        let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
+        let createdAt = Date()
+        let greeting = greetingMessage(forChatId: id, createdAt: createdAt)
         let chat = Chat(
-            id: id, createdAt: Date(), title: strings.newChat,
-            snippet: String(greeting.prefix(60)),
-            messages: [ChatMessage(id: id + "-g", role: .assistant, text: greeting, model: model, isGreeting: true)]
+            id: id, createdAt: createdAt, title: strings.newChat,
+            snippet: String(greeting.text.prefix(60)),
+            messages: [greeting]
         )
         chats[id] = chat
+        // Persisted before `currentChatId` points at it: if the app is
+        // killed between the two (separate) saves, a stale-but-valid
+        // `currentChatId` beats a `currentChatId` dangling at a Chat that
+        // was never actually written to disk.
+        persistChat(id)
         currentChatId = id
         screen = .chat
     }
@@ -25,6 +68,7 @@ extension AppModel {
         if isFirstUser { chat.title = String(text.prefix(40)) }
         chat.snippet = String(text.prefix(60))
         chats[chatId] = chat
+        persistChat(chatId)
 
         draft = ""
 
@@ -38,9 +82,14 @@ extension AppModel {
 
     @discardableResult
     func regenerate(chatId: String, messageId: String) -> Task<Void, Never>? {
-        guard var chat = chats[chatId] else { return nil }
+        // Matches sendMessage()'s `!generating` guard — without it, tapping
+        // Regenerate while a reply is still streaming starts a second
+        // `streamReply` racing the first; whichever finishes last would
+        // overwrite the other's persisted result via `persistChat(_:)`.
+        guard !generating, var chat = chats[chatId] else { return nil }
         chat.messages.removeAll { $0.id == messageId }
         chats[chatId] = chat
+        persistChat(chatId)
 
         // See sendMessage() — no Model selected yet, nothing to regenerate with.
         guard let model else { return nil }
@@ -74,7 +123,14 @@ extension AppModel {
                     self.appendFailureMessage(chatId: chatId, error: error)
                 }
             }
-            await MainActor.run { self.generating = false }
+            // One save for the whole Generation, here at the end — not per
+            // chunk (`appendReplyChunk`/`beginReply` don't persist), so an
+            // app kill mid-stream never leaves a partial assistant Message
+            // on disk.
+            await MainActor.run {
+                self.generating = false
+                self.persistChat(chatId)
+            }
         }
     }
 
@@ -105,6 +161,7 @@ extension AppModel {
         guard var chat = chats[chatId] else { return }
         chat.messages.removeAll { $0.id == messageId }
         chats[chatId] = chat
+        persistChat(chatId)
     }
 
     func copyMessage(id: String, text: String) {
@@ -130,8 +187,16 @@ extension AppModel {
         for id in idsToDelete {
             chats.removeValue(forKey: id)
         }
+        // `currentChatId` reconciled (and persisted, via its own `didSet`)
+        // before the Chats themselves are deleted below: if the app is
+        // killed in between, disk ends up with a `currentChatId` that's
+        // still valid (or already nil) alongside some not-yet-deleted
+        // Chats — orphaned data, not a dangling reference.
         if let currentChatId, !chats.keys.contains(currentChatId) {
             self.currentChatId = nil
+        }
+        for id in idsToDelete {
+            persistenceStore.deleteChat(id: id)
         }
     }
 

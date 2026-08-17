@@ -40,9 +40,17 @@ final class AppModel: ObservableObject {
     @Published var onboardingStep: Int = 0
 
     // MARK: - Chat (AppModel+Chat.swift)
+    /// Not auto-persisted via `didSet` — an in-flight streamed reply mutates
+    /// this per chunk, and per-chunk disk writes are deliberately avoided.
+    /// Saved explicitly via `persistChats()` at well-defined points instead
+    /// (new Chat, sent Message, completed/failed Generation, deletions).
     @Published var chats: [String: Chat]
-    @Published var currentChatId: String?
-    @Published var draft: String = ""
+    @Published var currentChatId: String? {
+        didSet { persistenceStore.saveCurrentChatId(currentChatId) }
+    }
+    @Published var draft: String = "" {
+        didSet { persistenceStore.saveDraft(draft) }
+    }
     @Published var generating: Bool = false
     @Published var copiedId: String?
     @Published var showDeleteRangeDialog: Bool = false
@@ -60,20 +68,31 @@ final class AppModel: ObservableObject {
     var modelListFetchedForAddress: String?
     let backendClient: ChatBackendClient
     let modelCatalogClient: ModelCatalogClient
+    let persistenceStore: PersistenceStore
     let modelFetchTimeoutNanoseconds: UInt64
     let modelRetryBackoffNanoseconds: UInt64
 
     init(
         backendClient: ChatBackendClient = OpenAICompatibleChatBackendClient(),
         modelCatalogClient: ModelCatalogClient = OpenAICompatibleModelCatalogClient(),
+        persistenceStore: PersistenceStore = SwiftDataPersistenceStore(),
         modelFetchTimeoutNanoseconds: UInt64 = 30_000_000_000,
         modelRetryBackoffNanoseconds: UInt64 = 5_000_000_000
     ) {
         self.backendClient = backendClient
         self.modelCatalogClient = modelCatalogClient
+        self.persistenceStore = persistenceStore
         self.modelFetchTimeoutNanoseconds = modelFetchTimeoutNanoseconds
         self.modelRetryBackoffNanoseconds = modelRetryBackoffNanoseconds
-        self.chats = [:]
+        self.chats = persistenceStore.loadChats()
+        self.currentChatId = persistenceStore.loadCurrentChatId()
+        self.draft = persistenceStore.loadDraft()
+
+        if !chats.isEmpty {
+            screen = .chat
+        }
+        restoreGreetings()
+
         loadModels()
     }
 
