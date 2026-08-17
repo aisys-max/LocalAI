@@ -9,7 +9,7 @@ A locally-running LLM server the app connects to for generating replies — eith
 _Avoid_: Provider, model server.
 
 **Server Address**:
-The URL a Backend is reached at (e.g. `http://localhost:11434`). Each Backend has its own, editable in Settings and defaulting to that Backend's standard local port; not persisted across app relaunches.
+The URL a Backend is reached at (e.g. `http://localhost:11434`). Each Backend has its own, editable in Settings and defaulting to that Backend's standard local port. Persisted across app relaunches (via SwiftData), along with the rest of Settings.
 _Avoid_: Base URL, endpoint (in user-facing/Settings contexts — "base URL" is fine as an internal implementation term).
 
 **Model**:
@@ -25,12 +25,24 @@ In Settings and the Model Picker only (not onboarding), a failed or timed-out Mo
 _Avoid_: Polling (this is triggered/bounded, not a fixed background poll independent of user action).
 
 **Chat**:
-A single conversation thread: an ordered list of ChatMessages plus display metadata (title, snippet, day grouping). Identified by id, stored in `AppModel.chats`.
+A single conversation thread: an ordered list of ChatMessages plus display metadata (title, snippet, day grouping). Identified by id, stored in `AppModel.chats`. Persisted across app relaunches (via SwiftData), along with which Chat is currently open — the app resumes directly into the last-open Chat rather than landing on a blank/new one. The unsent composer draft also persists.
 _Avoid_: Conversation, session, thread.
 
 **Generation**:
-The in-flight act of a Backend producing an assistant ChatMessage for a Chat, delivered incrementally as streamed text chunks rather than as one final string.
+The in-flight act of a Backend producing an assistant ChatMessage for a Chat, delivered incrementally as streamed text chunks rather than as one final string. A Generation interrupted by the app being killed or crashing (not a normal stream error) surfaces the same way an ordinary failed Generation does on next launch — the existing failure-message treatment, not a truncated partial reply left in place.
 _Avoid_: Completion, response (those name the result, not the act).
+
+**Greeting**:
+The synthetic first assistant ChatMessage a new Chat opens with (`ChatMessage.isGreeting`), worded against whichever Backend/Model is selected at the moment it's shown. Always rendered live from the *current* Backend/Model, even for a Chat reopened after a relaunch or a Backend/Model switch — never frozen to whatever was selected when the Chat was created.
+_Avoid_: Welcome message, intro message.
+
+**Retention Period**:
+A user-chosen Settings option (1 week / 1 month / 6 months) controlling how long a Chat is kept before automatic expiry. Enforced at Chat granularity by `Chat.createdAt`, the same granularity as the existing manual bulk-delete ranges — never a partial, per-message trim. Checked once per app launch.
+_Avoid_: Retention policy, TTL (internal-implementation terms; use Retention Period in user-facing/Settings contexts).
+
+**Reset to Default**:
+A destructive Settings action that wipes every persisted Chat/ChatMessage and resets all Settings (Backend, Model, appearance, language, Server Addresses, Retention Period) to their defaults, then returns the app to onboarding (`onboardingStep = 0`). Applies immediately, in-session — no relaunch needed. Reuses the app's existing two-step confirm-dialog pattern (the one already used for bulk-delete-all).
+_Avoid_: Factory reset, wipe data (use Reset to Default in user-facing/Settings contexts).
 
 **Simulated Backend**:
 `SimulatedChatBackendClient` — a canned-reply stand-in for a real Backend connection, kept for SwiftUI previews and network-free unit tests. Not used as the app's default once a real Backend client exists.

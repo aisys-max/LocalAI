@@ -81,6 +81,26 @@ struct AppModelChatTests {
         #expect(model.chats[chatId]?.messages.last?.text == "second reply")
     }
 
+    @Test func regenerateWhileAlreadyGeneratingIsANoOp() async {
+        let model = makeTestAppModel(backendClient: FakeChatBackendClient(reply: "second reply"))
+        model.selectModel("test-model")
+        model.newChat()
+        let chatId = model.currentChatId!
+        let greetingId = model.chats[chatId]!.messages[0].id
+
+        model.draft = "hi"
+        let firstTask = model.sendMessage()
+        #expect(model.generating == true)
+
+        // A concurrent regenerate() must not start a second stream while
+        // one is already in flight — same guard sendMessage() already has.
+        let secondTask = model.regenerate(chatId: chatId, messageId: greetingId)
+        #expect(secondTask == nil)
+
+        await firstTask?.value
+        #expect(model.generating == false)
+    }
+
     @Test func copyMessageSetsCopiedId() {
         let model = makeTestAppModel()
         model.copyMessage(id: "m1", text: "some text")
