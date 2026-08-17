@@ -84,6 +84,7 @@ struct ChatView: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.interactively)
                 .padding(.vertical, 8)
                 .onChange(of: model.currentChat?.messages.count) { _, _ in
                     scrollToBottom(proxy)
