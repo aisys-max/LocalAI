@@ -66,6 +66,13 @@ final class AppModel: ObservableObject {
     /// the previous fetch actually succeeded (state is `.loaded`, not
     /// `.failed`, so state alone can't signal a stale fetch).
     var modelListFetchedForAddress: String?
+    /// The `model` value loaded from persistence at launch, cleared the
+    /// first time a Model-list fetch resolves. Lets `loadModels()`
+    /// distinguish "this is the persisted selection, still unconfirmed
+    /// against a live list" (invalidate it if the fetched list doesn't
+    /// contain it) from "the user already picked something during this
+    /// session" (never clobber that, regardless of list contents).
+    var modelPendingValidation: String?
     let backendClient: ChatBackendClient
     let modelCatalogClient: ModelCatalogClient
     let persistenceStore: PersistenceStore
@@ -87,6 +94,14 @@ final class AppModel: ObservableObject {
         self.chats = persistenceStore.loadChats()
         self.currentChatId = persistenceStore.loadCurrentChatId()
         self.draft = persistenceStore.loadDraft()
+
+        let settings = persistenceStore.loadSettings()
+        self.backend = settings.backend
+        self.model = settings.model
+        self.backendServerAddresses = settings.backendServerAddresses
+        self.appearance = settings.appearance
+        self.language = settings.language
+        self.modelPendingValidation = settings.model
 
         if !chats.isEmpty {
             screen = .chat

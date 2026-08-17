@@ -40,9 +40,22 @@ final class PersistedMessage {
     }
 }
 
-/// Singleton row (`id == Self.singletonId`) holding the non-Chat bits of
-/// state this ticket persists — `currentChatId`/`draft`. Settings fields
-/// join this same row in a later ticket rather than a separate store.
+/// Singleton row (`id == Self.singletonId`) holding every non-Chat bit of
+/// state this app persists — `currentChatId`/`draft` plus all of Settings —
+/// one unified store rather than a separate mechanism (e.g. `UserDefaults`)
+/// for Settings. `backendServerAddressesData` is `[Backend: String]`
+/// JSON-encoded keyed by `Backend.rawValue` — SwiftData attributes don't
+/// support `Dictionary` directly at this deployment target (iOS 17).
+///
+/// The Settings fields are `Optional` even though every write always sets
+/// them: SwiftData's automatic lightweight migration can only add a new
+/// attribute to a store written by an earlier schema (this app shipped
+/// once already with only `currentChatId`/`draft` on this row) when that
+/// attribute is Optional — a non-optional addition fails migration and
+/// `makeDefaultContainer()` falls back to an in-memory store, silently
+/// discarding every existing user's Chats. `loadSettings()` treats a nil
+/// value (an old row that predates these columns) the same as "use the
+/// default," same as a brand-new row.
 @Model
 final class PersistedAppState {
     static let singletonId = "app-state"
@@ -50,11 +63,30 @@ final class PersistedAppState {
     @Attribute(.unique) var id: String
     var currentChatId: String?
     var draft: String
+    var backendRaw: String?
+    var model: String?
+    var backendServerAddressesData: Data?
+    var appearanceRaw: String?
+    var languageRaw: String?
 
-    init(id: String = PersistedAppState.singletonId, currentChatId: String? = nil, draft: String = "") {
+    init(
+        id: String = PersistedAppState.singletonId,
+        currentChatId: String? = nil,
+        draft: String = "",
+        backendRaw: String = Backend.ollama.rawValue,
+        model: String? = nil,
+        backendServerAddressesData: Data = Data(),
+        appearanceRaw: String = AppearanceMode.system.rawValue,
+        languageRaw: String = AppLanguage.en.rawValue
+    ) {
         self.id = id
         self.currentChatId = currentChatId
         self.draft = draft
+        self.backendRaw = backendRaw
+        self.model = model
+        self.backendServerAddressesData = backendServerAddressesData
+        self.appearanceRaw = appearanceRaw
+        self.languageRaw = languageRaw
     }
 }
 
@@ -115,6 +147,25 @@ final class SwiftDataPersistenceStore: PersistenceStore {
         fetchAppState()?.draft ?? ""
     }
 
+    func loadSettings() -> PersistedSettings {
+        guard let state = fetchAppState() else { return .default }
+        let addressesData = state.backendServerAddressesData ?? Data()
+        let addresses = (try? JSONDecoder().decode([String: String].self, from: addressesData)) ?? [:]
+        var backendServerAddresses: [Backend: String] = [:]
+        for (rawBackend, address) in addresses {
+            if let backend = Backend(rawValue: rawBackend) {
+                backendServerAddresses[backend] = address
+            }
+        }
+        return PersistedSettings(
+            backend: state.backendRaw.flatMap(Backend.init(rawValue:)) ?? .ollama,
+            model: state.model,
+            backendServerAddresses: backendServerAddresses,
+            appearance: state.appearanceRaw.flatMap(AppearanceMode.init(rawValue:)) ?? .system,
+            language: state.languageRaw.flatMap(AppLanguage.init(rawValue:)) ?? .en
+        )
+    }
+
     /// Upserts a single Chat and fully replaces *its own* Messages —
     /// scoped to `chat.id`, not a whole-store rewrite, so saving after one
     /// sent Message costs O(that Chat's Messages), not O(every Message
@@ -160,6 +211,17 @@ final class SwiftDataPersistenceStore: PersistenceStore {
     func saveDraft(_ draft: String) {
         let state = fetchOrCreateAppState()
         state.draft = draft
+        try? context.save()
+    }
+
+    func saveSettings(_ settings: PersistedSettings) {
+        let state = fetchOrCreateAppState()
+        state.backendRaw = settings.backend.rawValue
+        state.model = settings.model
+        let addresses = Dictionary(uniqueKeysWithValues: settings.backendServerAddresses.map { ($0.key.rawValue, $0.value) })
+        state.backendServerAddressesData = (try? JSONEncoder().encode(addresses)) ?? Data()
+        state.appearanceRaw = settings.appearance.rawValue
+        state.languageRaw = settings.language.rawValue
         try? context.save()
     }
 

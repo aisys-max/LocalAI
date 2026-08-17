@@ -11,6 +11,43 @@ struct SwiftDataPersistenceStoreTests {
         return try! ModelContainer(for: schema, configurations: [configuration])
     }
 
+    /// The Settings columns on `PersistedAppState` are `Optional` even
+    /// though every write always sets them, specifically so SwiftData's
+    /// lightweight migration can add them to a store written by the
+    /// earlier schema (which only had `currentChatId`/`draft`) without
+    /// failing — a non-optional addition fails migration and silently
+    /// falls back to an in-memory store, discarding every existing user's
+    /// Chats (see `makeDefaultContainer()`'s comment). This test can't
+    /// reproduce the migration itself (that needs two schema versions of
+    /// the *same* entity, which a single test target can't declare twice),
+    /// but it does verify the fallback path a migrated-but-not-yet-written
+    /// row would take: nil Settings columns still load as sane defaults.
+    @Test func aRowWithNilSettingsColumnsLoadsAsDefaultSettings() {
+        let container = makeInMemoryContainer()
+        let context = ModelContext(container)
+        context.insert(PersistedAppState(id: PersistedAppState.singletonId, currentChatId: "c1", draft: "d"))
+        // Constructor gives every field a value — explicitly null out the
+        // Settings columns to simulate a row migrated from the old schema.
+        let inserted = try! context.fetch(FetchDescriptor<PersistedAppState>()).first!
+        inserted.backendRaw = nil
+        inserted.model = nil
+        inserted.backendServerAddressesData = nil
+        inserted.appearanceRaw = nil
+        inserted.languageRaw = nil
+        try! context.save()
+
+        let store = SwiftDataPersistenceStore(container: container)
+        let settings = store.loadSettings()
+
+        #expect(store.loadCurrentChatId() == "c1")
+        #expect(store.loadDraft() == "d")
+        #expect(settings.backend == .ollama)
+        #expect(settings.model == nil)
+        #expect(settings.backendServerAddresses.isEmpty)
+        #expect(settings.appearance == .system)
+        #expect(settings.language == .en)
+    }
+
     @Test func loadChatsOnAnEmptyStoreReturnsEmpty() {
         let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
         #expect(store.loadChats().isEmpty)
@@ -119,5 +156,59 @@ struct SwiftDataPersistenceStoreTests {
 
         let messages = store.loadChats()["c1"]?.messages ?? []
         #expect(messages.map(\.id) == ["m1"])
+    }
+
+    @Test func loadSettingsOnAnEmptyStoreReturnsTheDefault() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        let settings = store.loadSettings()
+
+        #expect(settings.backend == .ollama)
+        #expect(settings.model == nil)
+        #expect(settings.backendServerAddresses.isEmpty)
+        #expect(settings.appearance == .system)
+        #expect(settings.language == .en)
+    }
+
+    @Test func saveSettingsThenLoadSettingsRoundTripsEveryField() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        let settings = PersistedSettings(
+            backend: .lmstudio,
+            model: "some-model",
+            backendServerAddresses: [.ollama: "http://a:1", .lmstudio: "http://b:2"],
+            appearance: .dark,
+            language: .ko
+        )
+
+        store.saveSettings(settings)
+        let loaded = store.loadSettings()
+
+        #expect(loaded.backend == .lmstudio)
+        #expect(loaded.model == "some-model")
+        #expect(loaded.backendServerAddresses == [.ollama: "http://a:1", .lmstudio: "http://b:2"])
+        #expect(loaded.appearance == .dark)
+        #expect(loaded.language == .ko)
+    }
+
+    @Test func savingSettingsRepeatedlyUpdatesTheSameRowRatherThanAccumulating() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        store.saveSettings(PersistedSettings(backend: .ollama, model: "m1", backendServerAddresses: [:], appearance: .light, language: .en))
+        store.saveSettings(PersistedSettings(backend: .lmstudio, model: "m2", backendServerAddresses: [:], appearance: .dark, language: .ko))
+
+        let loaded = store.loadSettings()
+        #expect(loaded.backend == .lmstudio)
+        #expect(loaded.model == "m2")
+        #expect(loaded.appearance == .dark)
+        #expect(loaded.language == .ko)
+    }
+
+    @Test func settingsAndAppStateShareTheSameSingletonRowWithoutClobberingEachOther() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        store.saveCurrentChatId("c1")
+        store.saveDraft("unsent")
+        store.saveSettings(PersistedSettings(backend: .lmstudio, model: "m1", backendServerAddresses: [:], appearance: .dark, language: .ko))
+
+        #expect(store.loadCurrentChatId() == "c1")
+        #expect(store.loadDraft() == "unsent")
+        #expect(store.loadSettings().backend == .lmstudio)
     }
 }

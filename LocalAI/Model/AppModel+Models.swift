@@ -47,8 +47,18 @@ extension AppModel {
             guard !Task.isCancelled else { return resolvedState }
             await MainActor.run {
                 self.modelListState = resolvedState
-                if case .loaded(let models) = resolvedState, self.model == nil {
-                    self.model = models.first
+                if case .loaded(let models) = resolvedState {
+                    // Only the persisted selection gets validated against the
+                    // fetched list (and only once, ever) — a Model the user
+                    // has since picked explicitly via selectModel() is never
+                    // second-guessed here, no matter what the list contains.
+                    if let pending = self.modelPendingValidation, self.model == pending, !models.contains(pending) {
+                        self.model = nil
+                    } else if self.model == nil {
+                        self.model = models.first
+                    }
+                    self.modelPendingValidation = nil
+                    self.persistSettings()
                 }
             }
             return resolvedState
@@ -122,6 +132,7 @@ extension AppModel {
 
         if modelListFetchedForAddress != serverAddress(for: backend) {
             model = nil
+            persistSettings()
             startModelRetryLoop()
             return
         }

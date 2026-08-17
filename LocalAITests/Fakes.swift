@@ -107,11 +107,14 @@ final class FakePersistenceStore: PersistenceStore {
     var chats: [String: Chat] = [:]
     var currentChatId: String?
     var draft: String = ""
+    var settings: PersistedSettings = .default
     private(set) var saveChatCallCount = 0
+    private(set) var saveSettingsCallCount = 0
 
     func loadChats() -> [String: Chat] { chats }
     func loadCurrentChatId() -> String? { currentChatId }
     func loadDraft() -> String { draft }
+    func loadSettings() -> PersistedSettings { settings }
 
     func saveChat(_ chat: Chat) {
         chats[chat.id] = chat
@@ -128,6 +131,11 @@ final class FakePersistenceStore: PersistenceStore {
 
     func saveDraft(_ draft: String) {
         self.draft = draft
+    }
+
+    func saveSettings(_ settings: PersistedSettings) {
+        self.settings = settings
+        saveSettingsCallCount += 1
     }
 }
 
