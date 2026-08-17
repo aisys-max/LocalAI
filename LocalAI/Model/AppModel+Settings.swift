@@ -94,7 +94,6 @@ extension AppModel {
     /// `chats`, which `deleteChats(in: .all)` below guarantees.
     func resetToDefault() {
         stopModelRetryLoop()
-        modelListState = .loading
         generating = false
         copyResetTask?.cancel()
         copiedId = nil
@@ -109,6 +108,14 @@ extension AppModel {
 
         onboardingStep = 0
         screen = .onboarding
+
+        // Matches AppModel.init, which always kicks off a fetch for the
+        // (default) Backend at the end — without this, `modelListState`
+        // just sits at whatever `stopModelRetryLoop()` left it/`.loading`
+        // forever, since onboarding's Backend step only calls
+        // `selectBackend(_:)` (which would otherwise trigger this) if the
+        // user taps a card, not when the already-selected default is kept.
+        loadModels()
     }
 
     /// The current Backend's server address, parsed as a URL for the

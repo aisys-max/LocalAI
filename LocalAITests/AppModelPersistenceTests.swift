@@ -510,4 +510,21 @@ struct AppModelPersistenceTests {
         #expect(model.copiedId == nil)
         #expect(model.legalOpenKey == nil)
     }
+
+    @Test func resetToDefaultTriggersAFreshModelListFetchInsteadOfStayingStuckLoading() async {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(model.modelListState == .loaded(["m1"]))
+
+        model.resetToDefault()
+
+        // A fresh fetch must actually be kicked off — matching what
+        // AppModel.init does on a genuine first launch — not just left at
+        // `.loading` forever (the onboarding Choose a Model step has no
+        // other trigger for this unless the user taps a Backend card).
+        #expect(model.modelListState == .loading)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(model.modelListState == .loaded(["m1"]))
+    }
 }
