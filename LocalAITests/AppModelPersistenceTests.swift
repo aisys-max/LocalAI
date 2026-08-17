@@ -16,7 +16,9 @@ struct AppModelPersistenceTests {
         let store = FakePersistenceStore()
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Old chat", snippet: "hi",
+                // Recent, not epoch-0 — this Chat must survive the
+                // default (1-month) Retention Period pruning at launch.
+                id: "c1", createdAt: Date(), title: "Old chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -122,7 +124,9 @@ struct AppModelPersistenceTests {
         let store = FakePersistenceStore()
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "",
+                // Recent, not epoch-0 — this Chat must survive the
+                // default (1-month) Retention Period pruning at launch.
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "",
                 messages: [
                     ChatMessage(id: "second", role: .assistant, text: "second", createdAt: Date(timeIntervalSince1970: 20)),
                     ChatMessage(id: "first", role: .user, text: "first", createdAt: Date(timeIntervalSince1970: 10))
@@ -284,5 +288,137 @@ struct AppModelPersistenceTests {
         try? await Task.sleep(nanoseconds: 20_000_000)
 
         #expect(model.model == "m2")
+    }
+
+    private func makeAgedChat(id: String, daysAgo: Int, now: Date) -> Chat {
+        let createdAt = Calendar.current.date(byAdding: .day, value: -daysAgo, to: now)!
+        return Chat(id: id, createdAt: createdAt, title: id, snippet: id, messages: [
+            ChatMessage(id: id + "-m1", role: .user, text: id, createdAt: createdAt)
+        ])
+    }
+
+    @Test func launchPrunesChatsOlderThanAOneWeekRetentionPeriod() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "recent": makeAgedChat(id: "recent", daysAgo: 2, now: now),
+            "old": makeAgedChat(id: "old", daysAgo: 10, now: now)
+        ]
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneWeek)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        #expect(model.chats["recent"] != nil)
+        #expect(model.chats["old"] == nil)
+        #expect(store.chats["old"] == nil)
+    }
+
+    @Test func launchPrunesChatsOlderThanAOneMonthRetentionPeriod() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "recent": makeAgedChat(id: "recent", daysAgo: 10, now: now),
+            "old": makeAgedChat(id: "old", daysAgo: 40, now: now)
+        ]
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneMonth)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        #expect(model.chats["recent"] != nil)
+        #expect(model.chats["old"] == nil)
+    }
+
+    @Test func launchPrunesChatsOlderThanASixMonthRetentionPeriod() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "recent": makeAgedChat(id: "recent", daysAgo: 60, now: now),
+            "old": makeAgedChat(id: "old", daysAgo: 200, now: now)
+        ]
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .sixMonths)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        #expect(model.chats["recent"] != nil)
+        #expect(model.chats["old"] == nil)
+    }
+
+    @Test func launchPruningClearsCurrentChatIdWhenTheOpenChatIsPruned() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = ["old": makeAgedChat(id: "old", daysAgo: 40, now: now)]
+        store.currentChatId = "old"
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneMonth)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        #expect(model.currentChatId == nil)
+        #expect(model.screen == .onboarding)
+    }
+
+    @Test func launchPruningTheOpenChatWithOthersSurvivingStartsAFreshChatInstead() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "old": makeAgedChat(id: "old", daysAgo: 40, now: now),
+            "recent": makeAgedChat(id: "recent", daysAgo: 1, now: now)
+        ]
+        store.currentChatId = "old"
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneMonth)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        // The pruned Chat's id must not linger as current, and — since a
+        // surviving Chat exists but there's no chat-switcher UI to reach it
+        // — a fresh Chat is started rather than leaving `screen == .chat`
+        // pointing at nothing.
+        #expect(model.currentChatId != nil)
+        #expect(model.currentChatId != "old")
+        #expect(model.screen == .chat)
+        #expect(model.chats["recent"] != nil)
+    }
+
+    @Test func shorteningRetentionPeriodPrunesImmediatelyWithoutRelaunch() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = ["old": makeAgedChat(id: "old", daysAgo: 10, now: now)]
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneMonth)
+
+        let model = makeTestAppModel(persistenceStore: store)
+        #expect(model.chats["old"] != nil)
+
+        model.setRetentionPeriod(.oneWeek)
+
+        #expect(model.chats["old"] == nil)
+        #expect(store.chats["old"] == nil)
+        #expect(store.settings.retentionPeriod == .oneWeek)
+    }
+
+    @Test func lengtheningRetentionPeriodDoesNotResurrectAlreadyPrunedChats() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        // Already pruned at launch (older than a week) before the test
+        // even changes the setting.
+        store.chats = ["old": makeAgedChat(id: "old", daysAgo: 10, now: now)]
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .oneWeek)
+
+        let model = makeTestAppModel(persistenceStore: store)
+        #expect(model.chats["old"] == nil)
+
+        model.setRetentionPeriod(.sixMonths)
+
+        #expect(model.chats["old"] == nil)
+    }
+
+    @Test func manualBulkDeleteIsUnaffectedByRetentionPeriod() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en, retentionPeriod: .sixMonths)
+        let model = makeTestAppModel(persistenceStore: store)
+        model.chats["c1"] = makeAgedChat(id: "c1", daysAgo: 0, now: now)
+
+        model.deleteChats(in: .today, now: now)
+
+        #expect(model.chats["c1"] == nil)
     }
 }

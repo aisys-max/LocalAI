@@ -214,14 +214,53 @@ extension AppModel {
         let idsToDelete = chats.values
             .filter { isChat($0, in: range, now: now, calendar: calendar) }
             .map(\.id)
+        deleteChats(withIds: idsToDelete)
+    }
+
+    /// Removes every Chat older than `retentionPeriod` (by `createdAt`) —
+    /// the automatic counterpart to the manual `deleteChats(in:)` above,
+    /// independent of it and using the same Chat-granularity deletion.
+    /// Called once at launch, and immediately whenever `retentionPeriod`
+    /// is shortened in Settings (see `setRetentionPeriod(_:)`) — a no-op
+    /// if nothing is out of the window. Deliberately not re-checked on a
+    /// foreground resume within an already-running session — a Chat that
+    /// crosses the cutoff mid-session waits for the next full launch, per
+    /// the "checked once per app launch" scope this was built to.
+    func pruneExpiredChats(now: Date = Date(), calendar: Calendar = .current) {
+        let cutoff = retentionPeriod.cutoffDate(now: now, calendar: calendar)
+        let idsToDelete = chats.values
+            .filter { $0.createdAt < cutoff }
+            .map(\.id)
+        let currentChatWasPruned = currentChatId.map(idsToDelete.contains) ?? false
+        deleteChats(withIds: idsToDelete)
+
+        // If the open Chat was the one pruned but others survive, there's
+        // no chat-switcher UI to fall back to one of them (see CONTEXT.md's
+        // Chat entry — only one Chat is ever "current"). Start a fresh one
+        // instead, matching how the app already handles this after a
+        // manual bulk delete (ChatView always calls `newChat()` next) —
+        // otherwise `screen` would stay `.chat` with no Chat selected.
+        if currentChatWasPruned && !chats.isEmpty {
+            newChat()
+        }
+    }
+
+    /// Shared by `deleteChats(in:)` and `pruneExpiredChats()`: removes the
+    /// given Chats from memory, reconciles `currentChatId` if it pointed at
+    /// one of them, then persists the deletions. `currentChatId` is
+    /// reconciled (and persisted, via its own `didSet`) *before* the Chats
+    /// themselves are deleted below: if the app is killed in between, disk
+    /// ends up with a `currentChatId` that's still valid (or already nil)
+    /// alongside some not-yet-deleted Chats — orphaned data, not a
+    /// dangling reference.
+    private func deleteChats(withIds idsToDelete: [String]) {
+        // No early-return on an empty `idsToDelete`: the currentChatId
+        // reconciliation below must still run unconditionally, exactly as
+        // it did before this helper was extracted — it's a self-healing
+        // check independent of whether *this* call found anything to delete.
         for id in idsToDelete {
             chats.removeValue(forKey: id)
         }
-        // `currentChatId` reconciled (and persisted, via its own `didSet`)
-        // before the Chats themselves are deleted below: if the app is
-        // killed in between, disk ends up with a `currentChatId` that's
-        // still valid (or already nil) alongside some not-yet-deleted
-        // Chats — orphaned data, not a dangling reference.
         if let currentChatId, !chats.keys.contains(currentChatId) {
             self.currentChatId = nil
         }

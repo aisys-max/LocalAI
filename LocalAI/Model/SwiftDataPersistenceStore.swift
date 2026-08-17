@@ -68,6 +68,7 @@ final class PersistedAppState {
     var backendServerAddressesData: Data?
     var appearanceRaw: String?
     var languageRaw: String?
+    var retentionPeriodRaw: String?
 
     init(
         id: String = PersistedAppState.singletonId,
@@ -77,7 +78,8 @@ final class PersistedAppState {
         model: String? = nil,
         backendServerAddressesData: Data = Data(),
         appearanceRaw: String = AppearanceMode.system.rawValue,
-        languageRaw: String = AppLanguage.en.rawValue
+        languageRaw: String = AppLanguage.en.rawValue,
+        retentionPeriodRaw: String = RetentionPeriod.oneMonth.rawValue
     ) {
         self.id = id
         self.currentChatId = currentChatId
@@ -87,6 +89,7 @@ final class PersistedAppState {
         self.backendServerAddressesData = backendServerAddressesData
         self.appearanceRaw = appearanceRaw
         self.languageRaw = languageRaw
+        self.retentionPeriodRaw = retentionPeriodRaw
     }
 }
 
@@ -162,7 +165,8 @@ final class SwiftDataPersistenceStore: PersistenceStore {
             model: state.model,
             backendServerAddresses: backendServerAddresses,
             appearance: state.appearanceRaw.flatMap(AppearanceMode.init(rawValue:)) ?? .system,
-            language: state.languageRaw.flatMap(AppLanguage.init(rawValue:)) ?? .en
+            language: state.languageRaw.flatMap(AppLanguage.init(rawValue:)) ?? .en,
+            retentionPeriod: state.retentionPeriodRaw.flatMap(RetentionPeriod.init(rawValue:)) ?? .oneMonth
         )
     }
 
@@ -222,6 +226,7 @@ final class SwiftDataPersistenceStore: PersistenceStore {
         state.backendServerAddressesData = (try? JSONEncoder().encode(addresses)) ?? Data()
         state.appearanceRaw = settings.appearance.rawValue
         state.languageRaw = settings.language.rawValue
+        state.retentionPeriodRaw = settings.retentionPeriod.rawValue
         try? context.save()
     }
 

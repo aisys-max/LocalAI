@@ -35,6 +35,7 @@ final class AppModel: ObservableObject {
     @Published var systemColorScheme: ColorScheme = .light
     @Published var language: AppLanguage = .en
     @Published var backendServerAddresses: [Backend: String] = [:]
+    @Published var retentionPeriod: RetentionPeriod = .oneMonth
 
     // MARK: - Onboarding (AppModel+Onboarding.swift)
     @Published var onboardingStep: Int = 0
@@ -101,7 +102,13 @@ final class AppModel: ObservableObject {
         self.backendServerAddresses = settings.backendServerAddresses
         self.appearance = settings.appearance
         self.language = settings.language
+        self.retentionPeriod = settings.retentionPeriod
         self.modelPendingValidation = settings.model
+
+        // Pruning first, before the now-possibly-removed Chats get a
+        // greeting synthesized for them (harmless either order, but no
+        // point doing that work for a Chat about to be pruned).
+        pruneExpiredChats()
 
         if !chats.isEmpty {
             screen = .chat

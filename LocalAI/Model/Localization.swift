@@ -86,6 +86,10 @@ struct Strings {
     let cancel: String
     let back: String
     let deleteConversations: String
+    let sectionRetention: String
+    let retentionOneWeek: String
+    let retentionOneMonth: String
+    let retentionSixMonths: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
@@ -127,7 +131,11 @@ struct Strings {
         deleteAllConfirmMessage: "This permanently deletes every conversation and can't be undone.",
         cancel: "Cancel",
         back: "Back",
-        deleteConversations: "Delete Conversations"
+        deleteConversations: "Delete Conversations",
+        sectionRetention: "Retention Period",
+        retentionOneWeek: "1 Week",
+        retentionOneMonth: "1 Month",
+        retentionSixMonths: "6 Months"
     )
 
     static let ko = Strings(
@@ -170,7 +178,11 @@ struct Strings {
         deleteAllConfirmMessage: "모든 대화가 영구적으로 삭제되며 되돌릴 수 없습니다.",
         cancel: "취소",
         back: "뒤로",
-        deleteConversations: "대화 삭제"
+        deleteConversations: "대화 삭제",
+        sectionRetention: "보관 기간",
+        retentionOneWeek: "1주일",
+        retentionOneMonth: "1개월",
+        retentionSixMonths: "6개월"
     )
 
     func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {

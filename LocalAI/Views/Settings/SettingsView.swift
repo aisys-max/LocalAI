@@ -75,6 +75,17 @@ struct SettingsView: View {
                         .padding(12)
                     }
 
+                    SectionLabel(model.strings.sectionRetention, theme: theme)
+                    GroupCard(theme: theme) {
+                        SegmentedPillControl(
+                            items: RetentionPeriodItem.all, label: { $0.label(model.strings) },
+                            isSelected: { $0.period == model.retentionPeriod },
+                            onSelect: { model.setRetentionPeriod($0.period) },
+                            theme: theme
+                        )
+                        .padding(12)
+                    }
+
                     SectionLabel(model.strings.sectionAbout, theme: theme)
                     GroupCard(theme: theme) {
                         ForEach(Array(LegalKey.allCases.enumerated()), id: \.element) { index, key in
@@ -135,6 +146,19 @@ private struct AppearanceItem: Identifiable {
         }
     }
     static let all: [AppearanceItem] = AppearanceMode.allCases.map { AppearanceItem(mode: $0) }
+}
+
+private struct RetentionPeriodItem: Identifiable {
+    let period: RetentionPeriod
+    var id: String { period.id }
+    func label(_ s: Strings) -> String {
+        switch period {
+        case .oneWeek: return s.retentionOneWeek
+        case .oneMonth: return s.retentionOneMonth
+        case .sixMonths: return s.retentionSixMonths
+        }
+    }
+    static let all: [RetentionPeriodItem] = RetentionPeriod.allCases.map { RetentionPeriodItem(period: $0) }
 }
 
 struct SectionLabel: View {

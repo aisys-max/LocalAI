@@ -24,6 +24,17 @@ extension AppModel {
     func setAppearance(_ a: AppearanceMode) { appearance = a; persistSettings() }
     func setLanguage(_ l: AppLanguage) { language = l; persistSettings() }
 
+    /// Shortening the Retention Period takes effect immediately — any Chat
+    /// now outside the window is pruned right away, not deferred to the
+    /// next launch. Lengthening it is a no-op for `pruneExpiredChats()`
+    /// (nothing to prune), so it's always safe to call unconditionally
+    /// rather than branching on direction.
+    func setRetentionPeriod(_ period: RetentionPeriod) {
+        retentionPeriod = period
+        persistSettings()
+        pruneExpiredChats()
+    }
+
     func serverAddress(for backend: Backend) -> String {
         backendServerAddresses[backend] ?? backend.defaultServerAddress
     }
@@ -42,7 +53,8 @@ extension AppModel {
             model: model,
             backendServerAddresses: backendServerAddresses,
             appearance: appearance,
-            language: language
+            language: language,
+            retentionPeriod: retentionPeriod
         ))
     }
 

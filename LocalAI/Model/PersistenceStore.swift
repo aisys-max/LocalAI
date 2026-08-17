@@ -8,6 +8,11 @@ struct PersistedSettings {
     var backendServerAddresses: [Backend: String]
     var appearance: AppearanceMode
     var language: AppLanguage
+    // Inline default (unlike its sibling fields above, which rely solely
+    // on `.default` below) so existing `PersistedSettings(...)` call sites
+    // written before this field existed keep compiling without every one
+    // needing an explicit `retentionPeriod:` argument.
+    var retentionPeriod: RetentionPeriod = .oneMonth
 
     static let `default` = PersistedSettings(
         backend: .ollama, model: nil, backendServerAddresses: [:], appearance: .system, language: .en
