@@ -152,8 +152,10 @@ struct AppModelPersistenceTests {
     @Test func launchInsertsAndPersistsAFailureMessageForAChatLeftWithATrailingUnansweredUserMessage() async {
         let store = FakePersistenceStore()
         store.chats = [
+            // Recent, not epoch-0 — this Chat must survive the default
+            // (1-month) Retention Period pruning at launch.
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -173,8 +175,10 @@ struct AppModelPersistenceTests {
     @Test func launchLeavesAChatAlreadyEndingInAnAssistantMessageUntouched() async {
         let store = FakePersistenceStore()
         store.chats = [
+            // Recent, not epoch-0 — this Chat must survive the default
+            // (1-month) Retention Period pruning at launch.
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [
                     ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1)),
                     ChatMessage(id: "m2", role: .assistant, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
@@ -194,13 +198,15 @@ struct AppModelPersistenceTests {
 
     @Test func launchDoesNotTouchAChatThatIsNotCurrentlyOpen() async {
         let store = FakePersistenceStore()
+        // Recent, not epoch-0 — both Chats must survive the default
+        // (1-month) Retention Period pruning at launch.
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Open chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Open chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             ),
             "c2": Chat(
-                id: "c2", createdAt: Date(timeIntervalSince1970: 0), title: "Other chat", snippet: "hey",
+                id: "c2", createdAt: Date(), title: "Other chat", snippet: "hey",
                 messages: [ChatMessage(id: "m2", role: .user, text: "hey", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -215,9 +221,11 @@ struct AppModelPersistenceTests {
 
     @Test func launchDoesNotMistakeANoModelSelectedSendForAnInterruptedGeneration() async {
         let store = FakePersistenceStore()
+        // Recent, not epoch-0 — this Chat must survive the default
+        // (1-month) Retention Period pruning at launch.
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
