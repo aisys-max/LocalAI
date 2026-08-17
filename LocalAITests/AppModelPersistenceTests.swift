@@ -144,4 +144,89 @@ struct AppModelPersistenceTests {
 
         #expect(store.draft == "half-typed message")
     }
+
+    @Test func launchInsertsAndPersistsAFailureMessageForAChatLeftWithATrailingUnansweredUserMessage() async {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(
+                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
+            )
+        ]
+        store.currentChatId = "c1"
+
+        // Detection runs only after the launch Model-list fetch resolves
+        // (it needs to know a Model is available — see detectInterruptedGeneration()).
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        let realMessages = model.chats["c1"]?.messages.filter { !$0.isGreeting } ?? []
+
+        #expect(realMessages.count == 2)
+        #expect(realMessages.last?.role == .assistant)
+        #expect(store.chats["c1"]?.messages.last?.role == .assistant)
+    }
+
+    @Test func launchLeavesAChatAlreadyEndingInAnAssistantMessageUntouched() async {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(
+                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                messages: [
+                    ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1)),
+                    ChatMessage(id: "m2", role: .assistant, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
+                ]
+            )
+        ]
+        store.currentChatId = "c1"
+        let saveCountBeforeLaunch = store.saveChatCallCount
+
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        let realMessages = model.chats["c1"]?.messages.filter { !$0.isGreeting } ?? []
+
+        #expect(realMessages.map(\.id) == ["m1", "m2"])
+        #expect(store.saveChatCallCount == saveCountBeforeLaunch)
+    }
+
+    @Test func launchDoesNotTouchAChatThatIsNotCurrentlyOpen() async {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(
+                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Open chat", snippet: "hi",
+                messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
+            ),
+            "c2": Chat(
+                id: "c2", createdAt: Date(timeIntervalSince1970: 0), title: "Other chat", snippet: "hey",
+                messages: [ChatMessage(id: "m2", role: .user, text: "hey", createdAt: Date(timeIntervalSince1970: 1))]
+            )
+        ]
+        store.currentChatId = "c1"
+
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        let otherChatRealMessages = model.chats["c2"]?.messages.filter { !$0.isGreeting } ?? []
+
+        #expect(otherChatRealMessages.map(\.id) == ["m2"])
+    }
+
+    @Test func launchDoesNotMistakeANoModelSelectedSendForAnInterruptedGeneration() async {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(
+                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
+            )
+        ]
+        store.currentChatId = "c1"
+
+        // No Models available even after the launch fetch resolves — the
+        // same on-disk shape sendMessage() leaves when it posts a user
+        // Message with no Model selected (see its own "no Model selected
+        // yet" comment). Must NOT be mistaken for an interrupted Generation.
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: []), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        let realMessages = model.chats["c1"]?.messages.filter { !$0.isGreeting } ?? []
+
+        #expect(realMessages.map(\.id) == ["m1"])
+    }
 }
