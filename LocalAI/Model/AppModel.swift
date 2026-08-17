@@ -108,7 +108,18 @@ final class AppModel: ObservableObject {
         }
         restoreGreetings()
 
-        loadModels()
+        // detectInterruptedGeneration() needs `model` populated to tell a
+        // real interruption apart from "no Model was ever selected" — both
+        // leave the same trailing-user-Message shape on disk — so it runs
+        // after the launch Model-list fetch resolves, not synchronously
+        // here where `model` is still whatever was last persisted (or nil).
+        let initialModelLoad = loadModels()
+        Task {
+            _ = await initialModelLoad.value
+            await MainActor.run {
+                self.detectInterruptedGeneration()
+            }
+        }
     }
 
     // MARK: - Derived

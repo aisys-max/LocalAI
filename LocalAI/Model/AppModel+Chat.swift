@@ -25,6 +25,36 @@ extension AppModel {
         }
     }
 
+    /// Detects a Generation interrupted by the app being killed/crashing
+    /// mid-stream: since an assistant Message is only ever written once its
+    /// stream completes (see `persistChat(_:)`'s call sites — never per
+    /// chunk), an interrupted Generation leaves no trace of its own, only a
+    /// trailing user Message with no reply after it. Scoped to just the
+    /// currently-open Chat (matching how the Generation that could've been
+    /// interrupted was itself scoped to one Chat). Reuses the existing
+    /// failure-message treatment — no new "interrupted" category — and
+    /// persists the inserted failure Message immediately so this doesn't
+    /// need to re-detect it on the next launch.
+    ///
+    /// Requires `model != nil`: `sendMessage()`/`regenerate()` both persist
+    /// a trailing user Message *before* checking whether a Model is
+    /// selected (see their "no Model selected yet" comments) — that's a
+    /// legitimate, un-interrupted state with the exact same on-disk shape
+    /// as a real interruption. A real interruption implies a Generation was
+    /// actually attempted, which implies a Model was selected at the time;
+    /// gating on a currently-available Model is how this tells the two
+    /// apart. Called once, after the launch Model-list fetch resolves (not
+    /// synchronously in `init`, where `model` isn't populated yet) — see
+    /// `AppModel.init`.
+    func detectInterruptedGeneration() {
+        guard model != nil, let chatId = currentChatId, let chat = chats[chatId],
+              let lastMessage = chat.messages.last, lastMessage.role == .user else { return }
+
+        let text = strings.replyFailureMessage(for: .other)
+        appendAssistantMessage(chatId: chatId, message: ChatMessage(id: UUID().uuidString, role: .assistant, text: text))
+        persistChat(chatId)
+    }
+
     /// Saves one Chat (by id) to the persistence store — scoped to just
     /// that Chat, not a whole-store rewrite — stripping its Greeting
     /// Message first (synthesized fresh on load, never stored). Called at
