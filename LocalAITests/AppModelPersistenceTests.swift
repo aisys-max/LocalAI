@@ -229,4 +229,60 @@ struct AppModelPersistenceTests {
 
         #expect(realMessages.map(\.id) == ["m1"])
     }
+
+    @Test func launchRestoresPersistedSettings() {
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(
+            backend: .lmstudio, model: "restored-model",
+            backendServerAddresses: [.lmstudio: "http://custom:1234"],
+            appearance: .dark, language: .ko
+        )
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        #expect(model.backend == .lmstudio)
+        #expect(model.model == "restored-model")
+        #expect(model.backendServerAddresses[.lmstudio] == "http://custom:1234")
+        #expect(model.appearance == .dark)
+        #expect(model.language == .ko)
+    }
+
+    @Test func settingsChangesArePersistedImmediately() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+
+        model.setAppearance(.dark)
+        model.setLanguage(.ko)
+        model.setServerAddress("http://custom:9999", for: .ollama)
+        model.selectModel("picked-model")
+
+        #expect(store.settings.appearance == .dark)
+        #expect(store.settings.language == .ko)
+        #expect(store.settings.backendServerAddresses[.ollama] == "http://custom:9999")
+        #expect(store.settings.model == "picked-model")
+    }
+
+    @Test func aPersistedModelNoLongerInTheFetchedListIsClearedAndThePersistedCorrectionSaved() async {
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(backend: .ollama, model: "uninstalled-model", backendServerAddresses: [:], appearance: .system, language: .en)
+
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1", "m2"]), persistenceStore: store)
+        #expect(model.model == "uninstalled-model")
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        #expect(model.model == nil)
+        #expect(store.settings.model == nil)
+    }
+
+    @Test func aPersistedModelStillInTheFetchedListIsLeftAlone() async {
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(backend: .ollama, model: "m2", backendServerAddresses: [:], appearance: .system, language: .en)
+
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1", "m2"]), persistenceStore: store)
+
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        #expect(model.model == "m2")
+    }
 }

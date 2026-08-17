@@ -4,6 +4,12 @@ extension AppModel {
     func selectBackend(_ b: Backend) {
         backend = b
         model = nil
+        // Whatever was pending validation belonged to the old Backend's
+        // Model namespace — irrelevant now, and `model == nil` already
+        // makes the pending-validation branch a no-op, but clearing it
+        // explicitly avoids leaving stale state around to reason about.
+        modelPendingValidation = nil
+        persistSettings()
         // Route through the retry loop if one is active, rather than calling
         // loadModels() directly — otherwise switching Backend mid-retry would
         // cancel the loop's in-flight fetch, leaving it stuck on `.loading`
@@ -14,9 +20,9 @@ extension AppModel {
             loadModels()
         }
     }
-    func selectModel(_ m: String) { model = m }
-    func setAppearance(_ a: AppearanceMode) { appearance = a }
-    func setLanguage(_ l: AppLanguage) { language = l }
+    func selectModel(_ m: String) { model = m; persistSettings() }
+    func setAppearance(_ a: AppearanceMode) { appearance = a; persistSettings() }
+    func setLanguage(_ l: AppLanguage) { language = l; persistSettings() }
 
     func serverAddress(for backend: Backend) -> String {
         backendServerAddresses[backend] ?? backend.defaultServerAddress
@@ -24,6 +30,20 @@ extension AppModel {
 
     func setServerAddress(_ address: String, for backend: Backend) {
         backendServerAddresses[backend] = address
+        persistSettings()
+    }
+
+    /// Saves the current Settings snapshot — called at well-defined mutation
+    /// points (like `AppModel+Chat.swift`'s `persistChat(_:)`), not via a
+    /// blanket `didSet` on every field.
+    func persistSettings() {
+        persistenceStore.saveSettings(PersistedSettings(
+            backend: backend,
+            model: model,
+            backendServerAddresses: backendServerAddresses,
+            appearance: appearance,
+            language: language
+        ))
     }
 
     /// The current Backend's server address, parsed as a URL for the
