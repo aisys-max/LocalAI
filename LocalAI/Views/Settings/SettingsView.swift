@@ -107,6 +107,16 @@ struct SettingsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .overlay(Rectangle().fill(theme.divider).frame(height: 1), alignment: .top)
                     }
+
+                    GroupCard(theme: theme) {
+                        GroupRow(theme: theme, isFirst: true) {
+                            model.showResetToDefaultConfirmation = true
+                        } content: {
+                            Text(model.strings.resetToDefault)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.top, 18)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -115,6 +125,17 @@ struct SettingsView: View {
         .background(theme.bg.ignoresSafeArea())
         .sheet(item: $model.legalOpenKey) { key in
             LegalSheetView(model: model, key: key, theme: theme)
+        }
+        .alert(
+            model.strings.resetToDefaultConfirmTitle,
+            isPresented: $model.showResetToDefaultConfirmation
+        ) {
+            Button(model.strings.cancel, role: .cancel) { }
+            Button(model.strings.reset, role: .destructive) {
+                model.resetToDefault()
+            }
+        } message: {
+            Text(model.strings.resetToDefaultConfirmMessage)
         }
     }
 

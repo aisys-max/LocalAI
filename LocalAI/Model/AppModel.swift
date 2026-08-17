@@ -36,6 +36,7 @@ final class AppModel: ObservableObject {
     @Published var language: AppLanguage = .en
     @Published var backendServerAddresses: [Backend: String] = [:]
     @Published var retentionPeriod: RetentionPeriod = .oneMonth
+    @Published var showResetToDefaultConfirmation: Bool = false
 
     // MARK: - Onboarding (AppModel+Onboarding.swift)
     @Published var onboardingStep: Int = 0
@@ -97,12 +98,7 @@ final class AppModel: ObservableObject {
         self.draft = persistenceStore.loadDraft()
 
         let settings = persistenceStore.loadSettings()
-        self.backend = settings.backend
-        self.model = settings.model
-        self.backendServerAddresses = settings.backendServerAddresses
-        self.appearance = settings.appearance
-        self.language = settings.language
-        self.retentionPeriod = settings.retentionPeriod
+        applySettings(settings)
         self.modelPendingValidation = settings.model
 
         // Pruning first, before the now-possibly-removed Chats get a

@@ -90,6 +90,10 @@ struct Strings {
     let retentionOneWeek: String
     let retentionOneMonth: String
     let retentionSixMonths: String
+    let resetToDefault: String
+    let resetToDefaultConfirmTitle: String
+    let resetToDefaultConfirmMessage: String
+    let reset: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
@@ -135,7 +139,11 @@ struct Strings {
         sectionRetention: "Retention Period",
         retentionOneWeek: "1 Week",
         retentionOneMonth: "1 Month",
-        retentionSixMonths: "6 Months"
+        retentionSixMonths: "6 Months",
+        resetToDefault: "Reset to Default",
+        resetToDefaultConfirmTitle: "Reset to default?",
+        resetToDefaultConfirmMessage: "This deletes every conversation and resets all Settings to their defaults. This can't be undone.",
+        reset: "Reset"
     )
 
     static let ko = Strings(
@@ -182,7 +190,11 @@ struct Strings {
         sectionRetention: "보관 기간",
         retentionOneWeek: "1주일",
         retentionOneMonth: "1개월",
-        retentionSixMonths: "6개월"
+        retentionSixMonths: "6개월",
+        resetToDefault: "기본값으로 재설정",
+        resetToDefaultConfirmTitle: "기본값으로 재설정할까요?",
+        resetToDefaultConfirmMessage: "모든 대화가 삭제되고 모든 설정이 기본값으로 초기화됩니다. 되돌릴 수 없습니다.",
+        reset: "재설정"
     )
 
     func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {

@@ -152,8 +152,10 @@ struct AppModelPersistenceTests {
     @Test func launchInsertsAndPersistsAFailureMessageForAChatLeftWithATrailingUnansweredUserMessage() async {
         let store = FakePersistenceStore()
         store.chats = [
+            // Recent, not epoch-0 — this Chat must survive the default
+            // (1-month) Retention Period pruning at launch.
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -173,8 +175,10 @@ struct AppModelPersistenceTests {
     @Test func launchLeavesAChatAlreadyEndingInAnAssistantMessageUntouched() async {
         let store = FakePersistenceStore()
         store.chats = [
+            // Recent, not epoch-0 — this Chat must survive the default
+            // (1-month) Retention Period pruning at launch.
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [
                     ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1)),
                     ChatMessage(id: "m2", role: .assistant, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
@@ -194,13 +198,15 @@ struct AppModelPersistenceTests {
 
     @Test func launchDoesNotTouchAChatThatIsNotCurrentlyOpen() async {
         let store = FakePersistenceStore()
+        // Recent, not epoch-0 — both Chats must survive the default
+        // (1-month) Retention Period pruning at launch.
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Open chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Open chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             ),
             "c2": Chat(
-                id: "c2", createdAt: Date(timeIntervalSince1970: 0), title: "Other chat", snippet: "hey",
+                id: "c2", createdAt: Date(), title: "Other chat", snippet: "hey",
                 messages: [ChatMessage(id: "m2", role: .user, text: "hey", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -215,9 +221,11 @@ struct AppModelPersistenceTests {
 
     @Test func launchDoesNotMistakeANoModelSelectedSendForAnInterruptedGeneration() async {
         let store = FakePersistenceStore()
+        // Recent, not epoch-0 — this Chat must survive the default
+        // (1-month) Retention Period pruning at launch.
         store.chats = [
             "c1": Chat(
-                id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "Chat", snippet: "hi",
+                id: "c1", createdAt: Date(), title: "Chat", snippet: "hi",
                 messages: [ChatMessage(id: "m1", role: .user, text: "hi", createdAt: Date(timeIntervalSince1970: 1))]
             )
         ]
@@ -420,5 +428,103 @@ struct AppModelPersistenceTests {
         model.deleteChats(in: .today, now: now)
 
         #expect(model.chats["c1"] == nil)
+    }
+
+    @Test func resetToDefaultClearsEveryChatAndPersistsTheDeletions() {
+        let now = Date()
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": makeAgedChat(id: "c1", daysAgo: 0, now: now),
+            "c2": makeAgedChat(id: "c2", daysAgo: 0, now: now)
+        ]
+        store.currentChatId = "c1"
+        let model = makeTestAppModel(persistenceStore: store)
+
+        model.resetToDefault()
+
+        #expect(model.chats.isEmpty)
+        #expect(store.chats.isEmpty)
+        #expect(model.currentChatId == nil)
+    }
+
+    @Test func resetToDefaultClearsTheDraft() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.draft = "half-typed message"
+
+        model.resetToDefault()
+
+        #expect(model.draft == "")
+        #expect(store.draft == "")
+    }
+
+    @Test func resetToDefaultResetsEverySettingToItsDefaultAndPersistsIt() {
+        let store = FakePersistenceStore()
+        store.settings = PersistedSettings(
+            backend: .lmstudio, model: "custom-model",
+            backendServerAddresses: [.lmstudio: "http://custom:1234"],
+            appearance: .dark, language: .ko, retentionPeriod: .sixMonths
+        )
+        let model = makeTestAppModel(persistenceStore: store)
+
+        model.resetToDefault()
+
+        #expect(model.backend == PersistedSettings.default.backend)
+        #expect(model.model == PersistedSettings.default.model)
+        #expect(model.backendServerAddresses == PersistedSettings.default.backendServerAddresses)
+        #expect(model.appearance == PersistedSettings.default.appearance)
+        #expect(model.language == PersistedSettings.default.language)
+        #expect(model.retentionPeriod == PersistedSettings.default.retentionPeriod)
+        #expect(store.settings.backend == PersistedSettings.default.backend)
+        #expect(store.settings.retentionPeriod == PersistedSettings.default.retentionPeriod)
+    }
+
+    @Test func resetToDefaultResetsOnboardingAndReturnsToOnboardingScreen() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.onboardingStep = 2
+        model.screen = .settings
+
+        model.resetToDefault()
+
+        #expect(model.onboardingStep == 0)
+        #expect(model.screen == .onboarding)
+    }
+
+    @Test func resetToDefaultStopsInFlightModelWorkAndClearsStaleState() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(shouldFail: true), persistenceStore: store)
+        model.startModelRetryLoop()
+        #expect(model.modelRetryLoopTask != nil)
+
+        model.resetToDefault()
+
+        // The retry loop (and any bare in-flight fetch) must be stopped —
+        // otherwise a fetch for the *old* Backend could resolve after the
+        // reset and silently re-persist a non-default Model.
+        #expect(model.modelRetryLoopTask == nil)
+        #expect(model.isRetryingModels == false)
+        #expect(model.modelListState == .loading)
+        #expect(model.modelPendingValidation == nil)
+        #expect(model.generating == false)
+        #expect(model.copiedId == nil)
+        #expect(model.legalOpenKey == nil)
+    }
+
+    @Test func resetToDefaultTriggersAFreshModelListFetchInsteadOfStayingStuckLoading() async {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(model.modelListState == .loaded(["m1"]))
+
+        model.resetToDefault()
+
+        // A fresh fetch must actually be kicked off — matching what
+        // AppModel.init does on a genuine first launch — not just left at
+        // `.loading` forever (the onboarding Choose a Model step has no
+        // other trigger for this unless the user taps a Backend card).
+        #expect(model.modelListState == .loading)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(model.modelListState == .loaded(["m1"]))
     }
 }
