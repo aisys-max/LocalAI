@@ -25,15 +25,20 @@ struct PersistedSettings {
 /// the `ChatBackendClient`/`ModelCatalogClient` injection pattern so
 /// `AppModel` stays unit-testable without a real SwiftData store.
 protocol PersistenceStore {
+    /// Each Chat's Messages come back ordered by `createdAt` — callers rely
+    /// on this rather than re-sorting themselves (see
+    /// `AppModel.bootstrapMissingGreetings()`, which only re-derives order
+    /// for a legacy Chat that predates persisted Greetings; every other Chat
+    /// depends on this guarantee holding here).
     func loadChats() -> [String: Chat]
     func loadCurrentChatId() -> String?
     func loadDraft() -> String
     func loadSettings() -> PersistedSettings
 
     /// Upserts a single Chat and replaces its Messages — scoped to
-    /// `chat.id`, not a whole-store rewrite. The Greeting Message
-    /// (`isGreeting == true`), if any, must not be included — callers are
-    /// responsible for filtering it out before saving.
+    /// `chat.id`, not a whole-store rewrite. Greeting Messages
+    /// (`isGreeting == true`) are regular Messages here, saved like any
+    /// other — they're no longer stripped before this is called.
     func saveChat(_ chat: Chat)
     func deleteChat(id: String)
     func saveCurrentChatId(_ currentChatId: String?)

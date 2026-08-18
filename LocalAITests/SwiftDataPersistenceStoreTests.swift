@@ -73,6 +73,24 @@ struct SwiftDataPersistenceStoreTests {
         #expect(loaded?.messages.first { $0.id == "m2" }?.role == .assistant)
     }
 
+    /// `loadChats()` has no `AppModel`-side re-sort to fall back on once a
+    /// Chat already has a persisted Greeting (see `bootstrapMissingGreetings()`,
+    /// which only touches Chats with none) — this store must return Messages
+    /// in `createdAt` order itself. Saved deliberately out of `createdAt`
+    /// order to catch a regression to an unsorted (fetch-order) result.
+    @Test func loadChatsReturnsMessagesOrderedByCreatedAtRegardlessOfSaveOrder() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        store.saveChat(Chat(id: "c1", createdAt: Date(timeIntervalSince1970: 0), title: "t", snippet: "s", messages: [
+            ChatMessage(id: "third", role: .assistant, text: "third", createdAt: Date(timeIntervalSince1970: 30)),
+            ChatMessage(id: "first", role: .assistant, text: "first", createdAt: Date(timeIntervalSince1970: 10)),
+            ChatMessage(id: "second", role: .user, text: "second", createdAt: Date(timeIntervalSince1970: 20))
+        ]))
+
+        let loaded = store.loadChats()["c1"]
+
+        #expect(loaded?.messages.map(\.id) == ["first", "second", "third"])
+    }
+
     @Test func savingAChatTwiceReplacesItsMessagesRatherThanAccumulating() {
         let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
         var chat = Chat(id: "c1", createdAt: Date(), title: "t", snippet: "s", messages: [
@@ -142,6 +160,39 @@ struct SwiftDataPersistenceStoreTests {
         #expect(store.loadDraft() == "second")
     }
 
+    @Test func isGreetingRoundTripsThroughSaveAndLoad() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        store.saveChat(Chat(id: "c1", createdAt: Date(), title: "t", snippet: "s", messages: [
+            ChatMessage(id: "g1", role: .assistant, text: "hi", isGreeting: true),
+            ChatMessage(id: "m1", role: .user, text: "hello", isGreeting: false)
+        ]))
+
+        let messages = store.loadChats()["c1"]?.messages ?? []
+
+        #expect(messages.first { $0.id == "g1" }?.isGreeting == true)
+        #expect(messages.first { $0.id == "m1" }?.isGreeting == false)
+    }
+
+    /// `PersistedMessage.isGreeting` is `Optional` for the same lightweight-
+    /// migration reason as `PersistedAppState`'s Settings columns above — a
+    /// row written before this attribute existed loads with a nil column,
+    /// which must read back as `false`, not crash or default to `true`.
+    @Test func aMessageWithANilIsGreetingColumnLoadsAsNotAGreeting() {
+        let container = makeInMemoryContainer()
+        let store = SwiftDataPersistenceStore(container: container)
+        store.saveChat(Chat(id: "c1", createdAt: Date(), title: "t", snippet: "s", messages: [
+            ChatMessage(id: "m1", role: .user, text: "kept")
+        ]))
+        let context = ModelContext(container)
+        let persisted = try! context.fetch(FetchDescriptor<PersistedMessage>()).first!
+        persisted.isGreeting = nil
+        try! context.save()
+
+        let messages = store.loadChats()["c1"]?.messages ?? []
+
+        #expect(messages.first { $0.id == "m1" }?.isGreeting == false)
+    }
+
     @Test func aMessageWithAnUnparseableRoleIsDroppedRatherThanMisclassified() {
         let container = makeInMemoryContainer()
         let store = SwiftDataPersistenceStore(container: container)
@@ -151,7 +202,7 @@ struct SwiftDataPersistenceStoreTests {
 
         // Simulate corrupted/unrecognized role data landing directly in the store.
         let context = ModelContext(container)
-        context.insert(PersistedMessage(id: "m2", chatId: "c1", roleRaw: "not-a-real-role", text: "corrupt", model: nil, createdAt: Date()))
+        context.insert(PersistedMessage(id: "m2", chatId: "c1", roleRaw: "not-a-real-role", text: "corrupt", model: nil, createdAt: Date(), isGreeting: false))
         try? context.save()
 
         let messages = store.loadChats()["c1"]?.messages ?? []

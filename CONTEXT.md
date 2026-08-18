@@ -33,7 +33,7 @@ The in-flight act of a Backend producing an assistant ChatMessage for a Chat, de
 _Avoid_: Completion, response (those name the result, not the act).
 
 **Greeting**:
-The synthetic first assistant ChatMessage a new Chat opens with (`ChatMessage.isGreeting`), worded against whichever Backend/Model is selected at the moment it's shown. Always rendered live from the *current* Backend/Model, even for a Chat reopened after a relaunch or a Backend/Model switch — never frozen to whatever was selected when the Chat was created.
+A synthetic assistant ChatMessage (`ChatMessage.isGreeting`) worded against whichever Backend/Model was selected at the moment it was shown, then persisted like any other Message — not re-rendered live on later launches. A new Chat gets one at creation; a Chat loaded from storage that predates this (zero Greeting Messages) gets one bootstrapped once, at launch. Identity is unique per occurrence, not derived from the Chat's id, since a Chat can end up holding more than one over its lifetime — the current app does not yet add a new one when returning to a Chat after a Backend/Model switch (planned, tracked separately).
 _Avoid_: Welcome message, intro message.
 
 **Retention Period**:

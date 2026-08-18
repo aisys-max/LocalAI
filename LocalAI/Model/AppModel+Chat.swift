@@ -2,26 +2,33 @@ import Foundation
 import UIKit
 
 extension AppModel {
-    /// The synthetic greeting Message a Chat opens with, worded against
-    /// whichever Backend/Model is *currently* selected — used both when
-    /// starting a new Chat and when restoring a loaded Chat's greeting
-    /// (never persisted; see `restoreGreetings()`).
-    func greetingMessage(forChatId chatId: String, createdAt: Date) -> ChatMessage {
+    /// A greeting Message worded against whichever Backend/Model is
+    /// *currently* selected — used both when starting a new Chat and when
+    /// bootstrapping a legacy Chat that predates persisted greetings (see
+    /// `bootstrapMissingGreetings()`). Identity is a fresh UUID per
+    /// occurrence, not derived from the Chat it belongs to, since a Chat can
+    /// end up holding more than one greeting over its lifetime.
+    func greetingMessage(createdAt: Date) -> ChatMessage {
         let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
-        return ChatMessage(id: chatId + "-g", role: .assistant, text: greeting, model: model, isGreeting: true, createdAt: createdAt)
+        return ChatMessage(id: UUID().uuidString, role: .assistant, text: greeting, model: model, isGreeting: true, createdAt: createdAt)
     }
 
-    /// Re-inserts a fresh greeting Message as the first Message of every
-    /// loaded Chat — greetings are never persisted (`persistChat(_:)`
-    /// strips them before saving), so a Chat loaded from storage needs one
-    /// synthesized back in. Called once at launch, before any UI reads
-    /// `chats`.
-    func restoreGreetings() {
+    /// One-time bootstrap for Chats that predate persisted greetings: any
+    /// loaded Chat with zero greeting Messages gets exactly one synthesized
+    /// (worded against the currently selected Backend/Model) and persisted
+    /// immediately — the same treatment `newChat()` already gives a brand
+    /// new Chat. A Chat that already has a greeting is left untouched, so
+    /// this never rewrites or duplicates one. Called once at launch, before
+    /// any UI reads `chats`.
+    func bootstrapMissingGreetings() {
         for (id, chat) in chats {
-            var restored = chat
-            let realMessages = chat.messages.filter { !$0.isGreeting }.sorted { $0.createdAt < $1.createdAt }
-            restored.messages = [greetingMessage(forChatId: id, createdAt: chat.createdAt)] + realMessages
-            chats[id] = restored
+            guard !chat.messages.contains(where: { $0.isGreeting }) else { continue }
+            var bootstrapped = chat
+            // `chat.messages` is already `createdAt`-ordered (guaranteed by
+            // `PersistenceStore.loadChats()`), so prepending here is enough.
+            bootstrapped.messages = [greetingMessage(createdAt: chat.createdAt)] + chat.messages
+            chats[id] = bootstrapped
+            persistChat(id)
         }
     }
 
@@ -56,23 +63,21 @@ extension AppModel {
     }
 
     /// Saves one Chat (by id) to the persistence store — scoped to just
-    /// that Chat, not a whole-store rewrite — stripping its Greeting
-    /// Message first (synthesized fresh on load, never stored). Called at
-    /// well-defined mutation points — never per streamed chunk, so an
-    /// interrupted in-flight Generation never leaves a partial assistant
-    /// Message on disk. No-op if `chatId` isn't in `chats` (e.g. already
-    /// deleted — see `deleteChats(in:)`, which uses `deleteChat(id:)` instead).
+    /// that Chat, not a whole-store rewrite. Greeting Messages are saved
+    /// like any other Message. Called at well-defined mutation points —
+    /// never per streamed chunk, so an interrupted in-flight Generation
+    /// never leaves a partial assistant Message on disk. No-op if `chatId`
+    /// isn't in `chats` (e.g. already deleted — see `deleteChats(in:)`,
+    /// which uses `deleteChat(id:)` instead).
     func persistChat(_ chatId: String) {
         guard let chat = chats[chatId] else { return }
-        var sanitized = chat
-        sanitized.messages = chat.messages.filter { !$0.isGreeting }
-        persistenceStore.saveChat(sanitized)
+        persistenceStore.saveChat(chat)
     }
 
     func newChat() {
         let id = "c\(Int(Date().timeIntervalSince1970 * 1000))"
         let createdAt = Date()
-        let greeting = greetingMessage(forChatId: id, createdAt: createdAt)
+        let greeting = greetingMessage(createdAt: createdAt)
         let chat = Chat(
             id: id, createdAt: createdAt, title: strings.newChat,
             snippet: String(greeting.text.prefix(60)),

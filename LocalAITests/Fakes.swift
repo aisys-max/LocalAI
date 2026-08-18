@@ -111,7 +111,17 @@ final class FakePersistenceStore: PersistenceStore {
     private(set) var saveChatCallCount = 0
     private(set) var saveSettingsCallCount = 0
 
-    func loadChats() -> [String: Chat] { chats }
+    // Honors the `PersistenceStore.loadChats()` ordering contract the same
+    // way the real SwiftData-backed store does, so tests that pre-seed
+    // `chats` out of `createdAt` order exercise the same guarantee
+    // `AppModel` relies on in production.
+    func loadChats() -> [String: Chat] {
+        chats.mapValues { chat in
+            var sorted = chat
+            sorted.messages = chat.messages.sorted { $0.createdAt < $1.createdAt }
+            return sorted
+        }
+    }
     func loadCurrentChatId() -> String? { currentChatId }
     func loadDraft() -> String { draft }
     func loadSettings() -> PersistedSettings { settings }

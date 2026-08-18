@@ -29,14 +29,22 @@ final class PersistedMessage {
     var text: String
     var model: String?
     var createdAt: Date
+    // Optional (not a plain Bool), same reasoning as PersistedAppState's
+    // Settings columns below: this attribute was added after Greetings
+    // stripped themselves before ever reaching this store, so existing
+    // installs may have message rows written by the earlier schema. A
+    // non-optional addition fails SwiftData's lightweight migration; a nil
+    // value here (an old row, or a genuinely-absent flag) reads as `false`.
+    var isGreeting: Bool?
 
-    init(id: String, chatId: String, roleRaw: String, text: String, model: String?, createdAt: Date) {
+    init(id: String, chatId: String, roleRaw: String, text: String, model: String?, createdAt: Date, isGreeting: Bool) {
         self.id = id
         self.chatId = chatId
         self.roleRaw = roleRaw
         self.text = text
         self.model = model
         self.createdAt = createdAt
+        self.isGreeting = isGreeting
     }
 }
 
@@ -109,13 +117,20 @@ final class SwiftDataPersistenceStore: PersistenceStore {
 
     func loadChats() -> [String: Chat] {
         guard let persistedChats = try? context.fetch(FetchDescriptor<PersistedChat>()) else { return [:] }
-        let allMessages = (try? context.fetch(FetchDescriptor<PersistedMessage>())) ?? []
+        // Sorted by `createdAt` here, not left to a caller — a fetch with no
+        // `sortBy` isn't guaranteed to come back in insertion/chronological
+        // order, and unlike the old design (which used to unconditionally
+        // re-sort every Chat's Messages after load), nothing downstream can
+        // be relied on to fix that up for a Chat that already has a
+        // persisted Greeting (see `AppModel.bootstrapMissingGreetings()`,
+        // which only touches Chats with none).
+        var messagesDescriptor = FetchDescriptor<PersistedMessage>()
+        messagesDescriptor.sortBy = [SortDescriptor(\.createdAt)]
+        let allMessages = (try? context.fetch(messagesDescriptor)) ?? []
         let messagesByChatId = Dictionary(grouping: allMessages, by: \.chatId)
 
         var result: [String: Chat] = [:]
         for persistedChat in persistedChats {
-            // Ordering by `createdAt` is guaranteed by `AppModel.restoreGreetings()`
-            // after load, not here — this store is a dumb read/write boundary.
             // A row with an unparseable `roleRaw` (corruption, a future
             // migration bug) is dropped rather than silently mislabeled as
             // either role.
@@ -127,7 +142,7 @@ final class SwiftDataPersistenceStore: PersistenceStore {
                         role: role,
                         text: persisted.text,
                         model: persisted.model,
-                        isGreeting: false,
+                        isGreeting: persisted.isGreeting ?? false,
                         createdAt: persisted.createdAt
                     )
                 }
@@ -192,7 +207,8 @@ final class SwiftDataPersistenceStore: PersistenceStore {
                 roleRaw: message.role.rawValue,
                 text: message.text,
                 model: message.model,
-                createdAt: message.createdAt
+                createdAt: message.createdAt,
+                isGreeting: message.isGreeting
             ))
         }
         try? context.save()
