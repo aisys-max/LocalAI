@@ -1,9 +1,11 @@
 # LocalAI
 
 SwiftUI port of the "Local AI Chat App Design" Claude Design prototype — a
-local-LLM (Ollama / LM Studio) chat client. Chat responses are currently
-simulated (canned replies), matching the source design 1:1; there is no real
-network layer yet.
+local-LLM (Ollama / LM Studio) chat client. Chat and model-list requests go
+out over a real network layer (`OpenAICompatibleChatBackendClient` /
+`OpenAICompatibleModelCatalogClient`, talking to either Backend's
+OpenAI-compatible API) by default; the canned-reply `SimulatedChatBackendClient`
+is kept only for SwiftUI previews and network-free tests.
 
 ## Folder structure
 
@@ -17,9 +19,10 @@ LocalAI/                  # app target source root
     AppModel+Settings.swift
     AppModel+Onboarding.swift
     AppModel+Chat.swift
-    ChatBackendClient.swift  # ChatBackendClient protocol + SimulatedChatBackendClient (canned replies) — the seam a real Ollama/LM Studio client slots into
+    ChatBackendClient.swift  # ChatBackendClient protocol + SimulatedChatBackendClient (canned replies, previews/tests only)
+    OpenAICompatibleChatBackendClient.swift  # the real ChatBackendClient — talks to whichever Backend's OpenAI-compatible endpoint is configured
     Chat.swift               # Chat / ChatMessage / MessageBlock / InlinePart — pure data, no logic
-    Backend.swift             # Backend enum (ollama/lmstudio) + per-backend model lists
+    Backend.swift             # Backend enum (ollama/lmstudio) — label, default Server Address, description/hint strings; Model lists are fetched live, not stored here
     Localization.swift        # AppLanguage enum + en/ko string + legal-text tables
   Views/                   # one subfolder per screen, mirroring the design's screen states
     Onboarding/
