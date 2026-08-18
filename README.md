@@ -110,6 +110,18 @@ here.
   Studio's own "Locally" app. LocalAI supports remote access via the
   underlying Tailscale mechanism instead (section 5), which requires a bit
   more manual setup but works the same way for both Backends.
+- The app enables `NSAllowsArbitraryLoads` in `NSAppTransportSecurity`,
+  rather than the narrower `NSAllowsLocalNetworking`. This is required
+  because Tailscale assigns addresses from the `100.64.0.0/10` CGNAT range
+  (RFC 6598), which `NSAllowsLocalNetworking`'s fixed RFC1918-only exception
+  doesn't cover, and iOS's App Transport Security has no CIDR-scoped
+  exception mechanism to target just that range. LocalAI only ever connects
+  to the single, user-configured Server Address (a self-hosted Ollama/LM
+  Studio instance the user runs themselves) — it never fetches arbitrary
+  third-party content — so this exception is scoped to that one feature in
+  practice, even though ATS itself can't express that. **If asked about this
+  during App Store review**, this paragraph is reusable verbatim as the
+  justification in App Store Connect's review notes.
 - iPhone only (`TARGETED_DEVICE_FAMILY: 1`) — no iPad-specific layout yet.
 - Only Ollama and LM Studio are supported, both via their shared
   OpenAI-compatible API surface — Ollama's native-only API features aren't
