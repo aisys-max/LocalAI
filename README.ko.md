@@ -106,6 +106,17 @@ Studio는 자사 동반 앱("Locally")에 한해 이 설정을 자동화해주�
   Studio 자사 앱 "Locally" 전용입니다. LocalAI는 대신 그 밑바탕이 되는
   Tailscale 메커니즘을 통해 원격 접속을 지원하며(5번 항목), 설정은 조금 더
   수동적이지만 두 Backend 모두 동일한 방식으로 동작합니다.
+- 앱은 `NSAppTransportSecurity`에서 더 좁은 `NSAllowsLocalNetworking` 대신
+  `NSAllowsArbitraryLoads`를 켜고 있습니다. Tailscale이 `100.64.0.0/10`
+  CGNAT 대역(RFC 6598)의 주소를 할당하는데, `NSAllowsLocalNetworking`의
+  고정된 RFC1918 전용 예외가 이 대역을 커버하지 않고, iOS의 App Transport
+  Security 자체에 특정 대역만 골라 예외 처리하는 기능이 없기 때문입니다.
+  LocalAI는 사용자가 직접 설정한 단 하나의 Server Address(사용자 본인이
+  운영하는 Ollama/LM Studio 인스턴스)에만 연결하고 임의의 제3자 콘텐츠를
+  가져오지 않으므로, ATS가 그렇게 표현할 방법은 없지만 실질적으로는 이
+  기능 하나에만 국한된 예외입니다. **App Store 심사 중 이 부분에 대해
+  질문받으면**, 이 문단을 App Store Connect의 Review 노트에 그대로
+  가져다 쓰시면 됩니다.
 - iPhone 전용입니다 (`TARGETED_DEVICE_FAMILY: 1`) — 아직 iPad 전용 레이아웃은
   없습니다.
 - Ollama와 LM Studio만 지원하며, 둘이 공유하는 OpenAI 호환 API만 사용합니다 —
