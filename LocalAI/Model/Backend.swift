@@ -26,4 +26,11 @@ enum Backend: String, CaseIterable, Identifiable {
         case .lmstudio: return language.strings.lmstudioDesc
         }
     }
+
+    func remoteAccessHint(_ language: AppLanguage) -> String {
+        switch self {
+        case .ollama: return language.strings.ollamaRemoteHint
+        case .lmstudio: return language.strings.lmstudioRemoteHint
+        }
+    }
 }
