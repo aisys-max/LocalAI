@@ -110,6 +110,10 @@ final class AppModel: ObservableObject {
             screen = .chat
         }
         bootstrapMissingGreetings()
+        // Normally reconciled at the `goChat()` choke point, but the app can
+        // also land straight on `.chat` here without ever going through it
+        // (killed mid-Settings, before tapping back) — covers that path too.
+        reconcileGreetingForCurrentChat()
 
         // detectInterruptedGeneration() needs `model` populated to tell a
         // real interruption apart from "no Model was ever selected" — both

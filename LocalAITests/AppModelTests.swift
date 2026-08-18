@@ -318,6 +318,222 @@ struct AppModelChatTests {
 
         #expect(model.chats[chatId]?.messages.last?.text == model.strings.replyErrorModelNotFound)
     }
+
+    @Test func returningToChatWithUnchangedBackendModelIsANoOpForGreetings() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        let saveCountBeforeGoChat = store.saveChatCallCount
+
+        model.goChat()
+
+        #expect(model.chats[chatId]?.messages.filter { $0.isGreeting }.count == 1)
+        #expect(store.saveChatCallCount == saveCountBeforeGoChat)
+    }
+
+    @Test func returningToAChatWithRealMessagesAfterABackendSwitchAppendsANewGreeting() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 2)
+        #expect(greetings.last?.backend == .lmstudio)
+        #expect(greetings.last?.model == "m2")
+        // Every prior Greeting stays in place, unchanged.
+        #expect(greetings.first?.backend == .ollama)
+        #expect(greetings.first?.model == "m1")
+        #expect(store.chats[chatId]?.messages.filter { $0.isGreeting }.count == 2)
+    }
+
+    @Test func returningToChatAfterOnlyTheModelChangedStillAppendsANewGreeting() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        // Same Backend, different Model.
+        model.selectModel("m2")
+        model.goChat()
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 2)
+        #expect(greetings.last?.backend == .ollama)
+        #expect(greetings.last?.model == "m2")
+    }
+
+    @Test func aGreetingThatPredatesTheBackendFieldIsBackfilledInPlaceRatherThanTreatedAsChanged() {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(id: "c1", createdAt: Date(), title: "Chat", snippet: "hi", messages: [
+                // Simulates a Greeting persisted before `ChatMessage.backend`
+                // existed — `backend` defaults to nil.
+                ChatMessage(id: "g1", role: .assistant, text: "hi", model: "m1", isGreeting: true, createdAt: Date(timeIntervalSince1970: 1)),
+                ChatMessage(id: "u1", role: .user, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
+            ])
+        ]
+        store.currentChatId = "c1"
+        store.settings = PersistedSettings(backend: .ollama, model: "m1", backendServerAddresses: [:], appearance: .system, language: .en)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        // Backfilled in place, not treated as a switch: still exactly one Greeting.
+        let greetings = model.chats["c1"]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 1)
+        #expect(greetings.first?.backend == .ollama)
+        #expect(store.chats["c1"]?.messages.first { $0.isGreeting }?.backend == .ollama)
+
+        // A genuine subsequent switch is then detected correctly.
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        let greetingsAfterSwitch = model.chats["c1"]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetingsAfterSwitch.count == 2)
+        #expect(greetingsAfterSwitch.last?.backend == .lmstudio)
+    }
+
+    @Test func noModelSelectedYetDoesNotProduceAPrematureGreetingOnBackendSwitch() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        // Mirrors selectBackend(_:)'s transient nil-model window — model not
+        // (yet) re-selected before returning to Chat.
+        model.selectBackend(.lmstudio)
+        model.goChat()
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 1)
+        #expect(greetings.first?.backend == .ollama)
+    }
+
+    @Test func deletingTheOnlyRealMessageThenSwitchingBackendStillAppendsRatherThanWipingPriorGreetings() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+        // Now: [greeting(ollama/m1), user "hi", greeting(lmstudio/m2)]
+
+        model.deleteMessage(chatId: chatId, messageId: "u1")
+        // Now: [greeting(ollama/m1), greeting(lmstudio/m2)] — zero real
+        // Messages, but this Chat has real history, unlike a pristine one.
+
+        model.selectBackend(.ollama)
+        model.selectModel("m1")
+        model.goChat()
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 3)
+        #expect(greetings.map(\.backend) == [.ollama, .lmstudio, .ollama])
+    }
+
+    @Test func launchReconcilesTheCurrentChatsGreetingWithoutGoingThroughGoChat() {
+        let store = FakePersistenceStore()
+        store.chats = [
+            "c1": Chat(id: "c1", createdAt: Date(), title: "Chat", snippet: "hi", messages: [
+                ChatMessage(id: "g1", role: .assistant, text: "hi", model: "old-model", backend: .ollama, isGreeting: true, createdAt: Date(timeIntervalSince1970: 1)),
+                ChatMessage(id: "u1", role: .user, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
+            ])
+        ]
+        store.currentChatId = "c1"
+        // Settings already reflect a switch that happened before the app
+        // was killed mid-Settings, i.e. before `goChat()` ever ran.
+        store.settings = PersistedSettings(backend: .lmstudio, model: "new-model", backendServerAddresses: [:], appearance: .system, language: .en)
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        let greetings = model.chats["c1"]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 2)
+        #expect(greetings.last?.backend == .lmstudio)
+        #expect(greetings.last?.model == "new-model")
+    }
+
+    @Test func returningToAnUnstartedChatAfterABackendSwitchReplacesItsSoleGreeting() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        let messages = model.chats[chatId]?.messages ?? []
+        #expect(messages.count == 1)
+        #expect(messages.first?.isGreeting == true)
+        #expect(messages.first?.backend == .lmstudio)
+        #expect(messages.first?.model == "m2")
+    }
+
+    @Test func switchingBackToAnEarlierBackendModelInTheSameChatStillAppendsRatherThanDeduping() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        model.selectBackend(.ollama)
+        model.selectModel("m1")
+        model.goChat()
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 3)
+        #expect(greetings.last?.backend == .ollama)
+        #expect(greetings.last?.model == "m1")
+    }
+
+    @Test func deletingAGreetingInAChatWithMultipleGreetingsOnlyRemovesTheTargetedOne() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        let greetingIds = model.chats[chatId]!.messages.filter { $0.isGreeting }.map(\.id)
+        #expect(greetingIds.count == 2)
+
+        model.deleteMessage(chatId: chatId, messageId: greetingIds[0])
+
+        let remainingGreetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(remainingGreetings.map(\.id) == [greetingIds[1]])
+    }
 }
 
 /// Fixed, deterministic dates for range/bucketing tests — real wall-clock

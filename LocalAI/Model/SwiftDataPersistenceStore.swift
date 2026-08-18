@@ -36,8 +36,13 @@ final class PersistedMessage {
     // non-optional addition fails SwiftData's lightweight migration; a nil
     // value here (an old row, or a genuinely-absent flag) reads as `false`.
     var isGreeting: Bool?
+    /// The Backend a Greeting was worded against (`ChatMessage.backend`),
+    /// nil for every non-Greeting Message. Stored raw (`Backend.rawValue`)
+    /// rather than as a relationship, matching `model`'s plain-`String?`
+    /// shape above.
+    var backendRaw: String?
 
-    init(id: String, chatId: String, roleRaw: String, text: String, model: String?, createdAt: Date, isGreeting: Bool) {
+    init(id: String, chatId: String, roleRaw: String, text: String, model: String?, createdAt: Date, isGreeting: Bool, backendRaw: String?) {
         self.id = id
         self.chatId = chatId
         self.roleRaw = roleRaw
@@ -45,6 +50,7 @@ final class PersistedMessage {
         self.model = model
         self.createdAt = createdAt
         self.isGreeting = isGreeting
+        self.backendRaw = backendRaw
     }
 }
 
@@ -142,6 +148,7 @@ final class SwiftDataPersistenceStore: PersistenceStore {
                         role: role,
                         text: persisted.text,
                         model: persisted.model,
+                        backend: persisted.backendRaw.flatMap(Backend.init(rawValue:)),
                         isGreeting: persisted.isGreeting ?? false,
                         createdAt: persisted.createdAt
                     )
@@ -208,7 +215,8 @@ final class SwiftDataPersistenceStore: PersistenceStore {
                 text: message.text,
                 model: message.model,
                 createdAt: message.createdAt,
-                isGreeting: message.isGreeting
+                isGreeting: message.isGreeting,
+                backendRaw: message.backend?.rawValue
             ))
         }
         try? context.save()

@@ -7,27 +7,16 @@ struct MessageBubbleView: View {
 
     private var isUser: Bool { message.role == .user }
 
-    /// Live text for the greeting message; the current Engine/Model rather
-    /// than whatever was selected when the chat was created.
-    private var displayText: String {
-        guard message.isGreeting else { return message.text }
-        return model.strings.greeting(backendLabel: model.backend.label, model: model.model, language: model.language)
-    }
-
-    private var displayModelName: String? {
-        message.isGreeting ? model.model : message.model
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if !isUser, let modelName = displayModelName {
+            if !isUser, let modelName = message.model {
                 Text(modelName.uppercased())
                     .font(AppFont.body(10.5, weight: .bold))
                     .tracking(0.3)
                     .foregroundColor(theme.accent2)
             }
 
-            ForEach(MessageParsing.blocks(from: displayText)) { block in
+            ForEach(MessageParsing.blocks(from: message.text)) { block in
                 switch block {
                 case .code(_, let text):
                     Text(text)
@@ -46,7 +35,7 @@ struct MessageBubbleView: View {
             if !isUser {
                 HStack(spacing: 14) {
                     Button {
-                        model.copyMessage(id: message.id, text: displayText)
+                        model.copyMessage(id: message.id, text: message.text)
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "doc.on.doc")

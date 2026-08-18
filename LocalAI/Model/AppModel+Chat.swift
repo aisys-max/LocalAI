@@ -10,7 +10,7 @@ extension AppModel {
     /// end up holding more than one greeting over its lifetime.
     func greetingMessage(createdAt: Date) -> ChatMessage {
         let greeting = strings.greeting(backendLabel: backend.label, model: model, language: language)
-        return ChatMessage(id: UUID().uuidString, role: .assistant, text: greeting, model: model, isGreeting: true, createdAt: createdAt)
+        return ChatMessage(id: UUID().uuidString, role: .assistant, text: greeting, model: model, backend: backend, isGreeting: true, createdAt: createdAt)
     }
 
     /// One-time bootstrap for Chats that predate persisted greetings: any
@@ -30,6 +30,62 @@ extension AppModel {
             chats[id] = bootstrapped
             persistChat(id)
         }
+    }
+
+    /// Called from `goChat()` — the single "return to Chat" choke point —
+    /// and once at launch (for the case where the app is killed mid-Settings
+    /// before the user ever taps back) to keep the current Chat's Greeting
+    /// history an accurate record of which Backend/Model actually produced
+    /// each stretch of conversation. Compares the currently selected
+    /// (Backend, Model) against the pair recorded on the Chat's most recent
+    /// Greeting (not its full history — switching back to an earlier
+    /// Backend/Model still counts as a change). No-op if they match, if the
+    /// Chat has no Greeting at all (shouldn't happen post-
+    /// `bootstrapMissingGreetings()`), or if no Model is selected yet —
+    /// `selectBackend(_:)` clears `model` before a fresh fetch resolves, and
+    /// reconciling against that transient `nil` would permanently bake a
+    /// "no model" Greeting into history for what's normally a brief window.
+    func reconcileGreetingForCurrentChat() {
+        guard let chatId = currentChatId, var chat = chats[chatId],
+              let lastGreetingIndex = chat.messages.lastIndex(where: { $0.isGreeting }),
+              model != nil else { return }
+        let lastGreeting = chat.messages[lastGreetingIndex]
+
+        guard let lastBackend = lastGreeting.backend else {
+            // Predates the `backend` field — there's no way to tell whether
+            // a switch actually happened, so this backfills the field in
+            // place rather than guessing at history. Matches
+            // `bootstrapMissingGreetings()`'s own rule: only ever add
+            // missing information, never rewrite what's already recorded.
+            chat.messages[lastGreetingIndex].backend = backend
+            chats[chatId] = chat
+            persistChat(chatId)
+            return
+        }
+        guard lastBackend != backend || lastGreeting.model != model else { return }
+
+        let newGreeting = greetingMessage(createdAt: Date())
+        // "Still unstarted" requires more than just "no real Messages right
+        // now" — a Chat that already accumulated more than one Greeting has
+        // real history to preserve even if its one real Message was since
+        // deleted (via ChatView's swipe-to-delete), so it must keep
+        // appending, not fall back to replacing and wiping that history.
+        let hasHistory = chat.messages.contains(where: { !$0.isGreeting })
+            || chat.messages.filter({ $0.isGreeting }).count > 1
+        if hasHistory {
+            // Real conversation already happened under the old Greeting —
+            // append, so it stays in place as a marker of what was true at
+            // the time, rather than being overwritten.
+            chat.messages.append(newGreeting)
+        } else {
+            // Still unstarted — an empty Chat only ever shows one, current
+            // Greeting, no matter how many times Backend/Model is flipped
+            // before the user sends anything.
+            chat.messages = [newGreeting]
+        }
+        chat.snippet = String(newGreeting.text.prefix(60))
+        chats[chatId] = chat
+        persistChat(chatId)
     }
 
     /// Detects a Generation interrupted by the app being killed/crashing
