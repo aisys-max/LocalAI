@@ -33,7 +33,7 @@ struct AppModelPersistenceTests {
         #expect(model.chats["c1"]?.messages.contains { $0.text == "hi" && $0.role == .user } == true)
     }
 
-    @Test func launchRestoresAGreetingMessageForEveryLoadedChatWithoutPersistingIt() {
+    @Test func launchBootstrapsAndPersistsAGreetingForALegacyChatWithNone() {
         let store = FakePersistenceStore()
         store.chats = [
             "c1": Chat(id: "c1", createdAt: Date(), title: "Old chat", snippet: "hi", messages: [])
@@ -42,11 +42,28 @@ struct AppModelPersistenceTests {
         let model = makeTestAppModel(persistenceStore: store)
 
         #expect(model.chats["c1"]?.messages.first?.isGreeting == true)
-        // The reconstructed greeting must never itself get written back to the store.
-        #expect(store.chats["c1"]?.messages.contains { $0.isGreeting } != true)
+        // The bootstrapped greeting is persisted immediately, not just kept in memory.
+        #expect(store.chats["c1"]?.messages.contains { $0.isGreeting } == true)
     }
 
-    @Test func newChatIsPersistedWithoutItsGreetingMessage() {
+    @Test func launchLeavesAChatsExistingPersistedGreetingUntouched() {
+        let store = FakePersistenceStore()
+        let existingGreeting = ChatMessage(id: "g1", role: .assistant, text: "already said hi", isGreeting: true, createdAt: Date(timeIntervalSince1970: 1))
+        store.chats = [
+            "c1": Chat(id: "c1", createdAt: Date(), title: "Old chat", snippet: "hi", messages: [existingGreeting])
+        ]
+        let saveCountBeforeLaunch = store.saveChatCallCount
+
+        let model = makeTestAppModel(persistenceStore: store)
+
+        // No new greeting added, the existing one's text is untouched, and
+        // no write happens for a Chat the bootstrap has nothing to do for.
+        #expect(model.chats["c1"]?.messages.filter { $0.isGreeting }.count == 1)
+        #expect(model.chats["c1"]?.messages.first?.text == "already said hi")
+        #expect(store.saveChatCallCount == saveCountBeforeLaunch)
+    }
+
+    @Test func newChatsGreetingIsPersistedImmediately() {
         let store = FakePersistenceStore()
         let model = makeTestAppModel(persistenceStore: store)
 
@@ -54,7 +71,7 @@ struct AppModelPersistenceTests {
         let chatId = model.currentChatId!
 
         #expect(store.chats[chatId] != nil)
-        #expect(store.chats[chatId]?.messages.isEmpty == true)
+        #expect(store.chats[chatId]?.messages.contains { $0.isGreeting } == true)
         #expect(store.currentChatId == chatId)
     }
 
@@ -186,14 +203,18 @@ struct AppModelPersistenceTests {
             )
         ]
         store.currentChatId = "c1"
-        let saveCountBeforeLaunch = store.saveChatCallCount
 
         let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
+        // Captured after the synchronous launch bootstrap (which persists a
+        // greeting for this legacy Chat) — what's under test here is that
+        // the async interruption-detection pass, resolved below, adds no
+        // further save for a Chat that's already correctly terminated.
+        let saveCountAfterLaunch = store.saveChatCallCount
         try? await Task.sleep(nanoseconds: 20_000_000)
         let realMessages = model.chats["c1"]?.messages.filter { !$0.isGreeting } ?? []
 
         #expect(realMessages.map(\.id) == ["m1", "m2"])
-        #expect(store.saveChatCallCount == saveCountBeforeLaunch)
+        #expect(store.saveChatCallCount == saveCountAfterLaunch)
     }
 
     @Test func launchDoesNotTouchAChatThatIsNotCurrentlyOpen() async {

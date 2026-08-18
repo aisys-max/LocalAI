@@ -102,14 +102,14 @@ final class AppModel: ObservableObject {
         self.modelPendingValidation = settings.model
 
         // Pruning first, before the now-possibly-removed Chats get a
-        // greeting synthesized for them (harmless either order, but no
+        // greeting bootstrapped for them (harmless either order, but no
         // point doing that work for a Chat about to be pruned).
         pruneExpiredChats()
 
         if !chats.isEmpty {
             screen = .chat
         }
-        restoreGreetings()
+        bootstrapMissingGreetings()
 
         // detectInterruptedGeneration() needs `model` populated to tell a
         // real interruption apart from "no Model was ever selected" — both

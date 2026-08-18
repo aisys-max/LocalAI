@@ -31,11 +31,12 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     var text: String
     var model: String?
-    /// The synthetic "hi" message a new chat opens with — unlike a real
-    /// generated reply, it isn't tied to whatever Engine/Model produced it,
-    /// so it's re-rendered against the live Engine/Model instead of the
-    /// snapshot captured when the chat was created. Never persisted —
-    /// synthesized fresh each time a Chat is loaded/displayed.
+    /// The synthetic "hi" message a Chat opens with — worded against
+    /// whichever Backend/Model was selected at the moment it was shown, then
+    /// persisted like any other Message (see `AppModel.greetingMessage`).
+    /// Unlike a real generated reply, its identity isn't reused across
+    /// occurrences — a Chat can accumulate more than one over its lifetime
+    /// as the Backend/Model changes underneath it.
     var isGreeting: Bool = false
     /// Orders Messages within a Chat after a save/reload round-trip — `id`
     /// alone isn't sortable (assistant message ids are random UUIDs).
