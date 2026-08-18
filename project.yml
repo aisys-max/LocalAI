@@ -16,8 +16,16 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocalNetworkUsageDescription: "Local AI connects to a local Ollama or LM Studio server on your network to chat with your on-device models."
+        # NSAllowsArbitraryLoads (not just NSAllowsLocalNetworking): the app
+        # only ever talks to the user-configured Server Address, but that
+        # address can be a Tailscale CGNAT address (100.64.0.0/10), which
+        # NSAllowsLocalNetworking's fixed RFC1918-only exception doesn't
+        # cover, and ATS has no CIDR-scoped exception mechanism to target
+        # just that range. See issue #33 for the full justification — reuse
+        # it verbatim in App Store Connect's review notes if asked about
+        # this at submission time.
         NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.local.localai
