@@ -322,6 +322,8 @@ struct AppModelChatTests {
     }
 
     @Test func returningToChatWithUnchangedBackendModelIsANoOpForGreetings() {
+        // Confirms the AppModel-side wiring — the append-vs-replace decision
+        // itself is tested directly in GreetingReconciliationTests.swift.
         let store = FakePersistenceStore()
         let model = makeTestAppModel(persistenceStore: store)
         model.selectModel("m1")
@@ -336,6 +338,9 @@ struct AppModelChatTests {
     }
 
     @Test func returningToAChatWithRealMessagesAfterABackendSwitchAppendsANewGreeting() {
+        // Confirms the AppModel-side wiring (write-back + persist on a real
+        // change) — the decision itself is tested directly in
+        // GreetingReconciliationTests.swift.
         let store = FakePersistenceStore()
         let model = makeTestAppModel(persistenceStore: store)
         model.selectModel("m1")
@@ -352,79 +357,7 @@ struct AppModelChatTests {
         #expect(greetings.count == 2)
         #expect(greetings.last?.backend == .lmstudio)
         #expect(greetings.last?.model == "m2")
-        // Every prior Greeting stays in place, unchanged.
-        #expect(greetings.first?.backend == .ollama)
-        #expect(greetings.first?.model == "m1")
         #expect(store.chats[chatId]?.messages.filter { $0.isGreeting }.count == 2)
-    }
-
-    @Test func returningToChatAfterOnlyTheModelChangedStillAppendsANewGreeting() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
-        model.persistChat(chatId)
-
-        // Same Backend, different Model.
-        model.selectModel("m2")
-        model.goChat()
-
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 2)
-        #expect(greetings.last?.backend == .ollama)
-        #expect(greetings.last?.model == "m2")
-    }
-
-    @Test func aGreetingThatPredatesTheBackendFieldIsBackfilledInPlaceRatherThanTreatedAsChanged() {
-        let store = FakePersistenceStore()
-        store.chats = [
-            "c1": Chat(id: "c1", createdAt: Date(), title: "Chat", snippet: "hi", messages: [
-                // Simulates a Greeting persisted before `ChatMessage.backend`
-                // existed — `backend` defaults to nil.
-                ChatMessage(id: "g1", role: .assistant, text: "hi", model: "m1", isGreeting: true, createdAt: Date(timeIntervalSince1970: 1)),
-                ChatMessage(id: "u1", role: .user, text: "hello", createdAt: Date(timeIntervalSince1970: 2))
-            ])
-        ]
-        store.currentChatId = "c1"
-        store.settings = PersistedSettings(backend: .ollama, model: "m1", backendServerAddresses: [:], appearance: .system, language: .en)
-
-        let model = makeTestAppModel(persistenceStore: store)
-
-        // Backfilled in place, not treated as a switch: still exactly one Greeting.
-        let greetings = model.chats["c1"]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 1)
-        #expect(greetings.first?.backend == .ollama)
-        #expect(store.chats["c1"]?.messages.first { $0.isGreeting }?.backend == .ollama)
-
-        // A genuine subsequent switch is then detected correctly.
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-
-        let greetingsAfterSwitch = model.chats["c1"]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetingsAfterSwitch.count == 2)
-        #expect(greetingsAfterSwitch.last?.backend == .lmstudio)
-    }
-
-    @Test func noModelSelectedYetDoesNotProduceAPrematureGreetingOnBackendSwitch() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
-        model.persistChat(chatId)
-
-        // Mirrors selectBackend(_:)'s transient nil-model window — model not
-        // (yet) re-selected before returning to Chat.
-        model.selectBackend(.lmstudio)
-        model.goChat()
-
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 1)
-        #expect(greetings.first?.backend == .ollama)
     }
 
     @Test func aModelThatResolvesAfterReturningToChatStillUpdatesTheGreeting() async {
@@ -489,69 +422,6 @@ struct AppModelChatTests {
         #expect(greetings.last?.model == "m2")
     }
 
-    @Test func repeatedlySwitchingBackendModelOnAStillEmptyChatNeverAccumulatesGreetings() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-
-        model.selectBackend(.ollama)
-        model.selectModel("m3")
-        model.goChat()
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m4")
-        model.goChat()
-
-        // Every switch replaced, never appended — exactly one Greeting,
-        // matching the current (latest) Backend/Model.
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 1)
-        #expect(greetings.first?.backend == .lmstudio)
-        #expect(greetings.first?.model == "m4")
-    }
-
-    @Test func deletingTheOnlyRealMessageThenSwitchingBackendReplacesOnlyTheLastGreeting() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
-        model.persistChat(chatId)
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-        // Now: [greeting(ollama/m1), user "hi", greeting(lmstudio/m2)]
-
-        model.deleteMessage(chatId: chatId, messageId: "u1")
-        // Now: [greeting(ollama/m1), greeting(lmstudio/m2)] — nothing after
-        // the last Greeting, so the *next* switch replaces just that last
-        // Greeting in place. The earlier one (a genuine record of how this
-        // Chat's real conversation started) is untouched — deleting a real
-        // Message never erases Greeting history that came before it.
-
-        model.selectBackend(.ollama)
-        model.selectModel("m1")
-        model.goChat()
-
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 2)
-        #expect(greetings.first?.backend == .ollama)
-        #expect(greetings.first?.model == "m1")
-        #expect(greetings.last?.backend == .ollama)
-        #expect(greetings.last?.model == "m1")
-        // Same content, but genuinely the replaced-in-place last Greeting,
-        // not the untouched first one.
-        #expect(greetings.first?.id != greetings.last?.id)
-    }
-
     @Test func launchReconcilesTheCurrentChatsGreetingWithoutGoingThroughGoChat() {
         let store = FakePersistenceStore()
         store.chats = [
@@ -571,82 +441,6 @@ struct AppModelChatTests {
         #expect(greetings.count == 2)
         #expect(greetings.last?.backend == .lmstudio)
         #expect(greetings.last?.model == "new-model")
-    }
-
-    @Test func returningToAnUnstartedChatAfterABackendSwitchReplacesItsSoleGreeting() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-
-        let messages = model.chats[chatId]?.messages ?? []
-        #expect(messages.count == 1)
-        #expect(messages.first?.isGreeting == true)
-        #expect(messages.first?.backend == .lmstudio)
-        #expect(messages.first?.model == "m2")
-    }
-
-    @Test func switchingBackToAnEarlierBackendModelAfterFurtherConversationStillAppendsRatherThanDeduping() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
-        model.persistChat(chatId)
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-
-        // A real Message after the lmstudio/m2 Greeting is what makes the
-        // next switch back append rather than replace it in place.
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u2", role: .user, text: "hi again"))
-        model.persistChat(chatId)
-
-        model.selectBackend(.ollama)
-        model.selectModel("m1")
-        model.goChat()
-
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 3)
-        #expect(greetings.last?.backend == .ollama)
-        #expect(greetings.last?.model == "m1")
-    }
-
-    @Test func switchingBackendAgainWithoutFurtherConversationReplacesTheJustAppendedGreeting() {
-        let store = FakePersistenceStore()
-        let model = makeTestAppModel(persistenceStore: store)
-        model.selectModel("m1")
-        model.newChat()
-        let chatId = model.currentChatId!
-        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
-        model.persistChat(chatId)
-
-        model.selectBackend(.lmstudio)
-        model.selectModel("m2")
-        model.goChat()
-        // Now: [greeting(ollama/m1), user "hi", greeting(lmstudio/m2)]
-
-        // No new Message sent since the lmstudio/m2 Greeting — switching
-        // again updates it in place rather than appending a third entry
-        // for a switch nobody actually used in between.
-        model.selectBackend(.ollama)
-        model.selectModel("m1")
-        model.goChat()
-
-        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 2)
-        #expect(greetings.first?.backend == .ollama)
-        #expect(greetings.first?.model == "m1")
-        #expect(greetings.last?.backend == .ollama)
-        #expect(greetings.last?.model == "m1")
-        #expect(greetings.first?.id != greetings.last?.id)
     }
 
     @Test func deletingAGreetingInAChatWithMultipleGreetingsOnlyRemovesTheTargetedOne() {
