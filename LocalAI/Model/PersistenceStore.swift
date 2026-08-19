@@ -24,6 +24,13 @@ struct PersistedSettings {
 /// at launch, after relevant mutations); the store just moves data. Mirrors
 /// the `ChatBackendClient`/`ModelCatalogClient` injection pattern so
 /// `AppModel` stays unit-testable without a real SwiftData store.
+///
+/// `@MainActor`: the real, SwiftData-backed conformance
+/// (`SwiftDataPersistenceStore`) wraps a `ModelContext`, which must never
+/// cross actor boundaries — this is the only caller, `AppModel`, already
+/// being `@MainActor` today is a convention, not something the compiler
+/// enforces without this annotation.
+@MainActor
 protocol PersistenceStore {
     /// Each Chat's Messages come back ordered by `createdAt` — callers rely
     /// on this rather than re-sorting themselves (see

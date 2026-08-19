@@ -127,12 +127,16 @@ enum LocalAIMigrationPlan: SchemaMigrationPlan {
     static var stages: [MigrationStage] { [] }
 }
 
+@MainActor
 final class SwiftDataPersistenceStore: PersistenceStore {
     private let context: ModelContext
     private static let logger = Logger(subsystem: "com.local.localai", category: "persistence")
 
-    init(container: ModelContainer = SwiftDataPersistenceStore.makeDefaultContainer()) {
-        self.context = ModelContext(container)
+    // Same default-argument-isolation issue as `AppModel.init` — a default
+    // parameter value can't call this (now-MainActor) type's own static
+    // method, so the default resolves inside the init body instead.
+    init(container: ModelContainer? = nil) {
+        self.context = ModelContext(container ?? Self.makeDefaultContainer())
     }
 
     /// Falls back to an in-memory store (discarding every existing user's

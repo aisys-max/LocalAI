@@ -158,14 +158,14 @@ final class FakePersistenceStore: PersistenceStore {
 func makeTestAppModel(
     backendClient: ChatBackendClient = FakeChatBackendClient(),
     modelCatalogClient: ModelCatalogClient = FakeModelCatalogClient(),
-    persistenceStore: PersistenceStore = FakePersistenceStore(),
+    persistenceStore: PersistenceStore? = nil,
     modelFetchTimeoutNanoseconds: UInt64 = 30_000_000,
     modelRetryBackoffNanoseconds: UInt64 = 10_000_000
 ) -> AppModel {
     AppModel(
         backendClient: backendClient,
         modelCatalogClient: modelCatalogClient,
-        persistenceStore: persistenceStore,
+        persistenceStore: persistenceStore ?? FakePersistenceStore(),
         modelFetchTimeoutNanoseconds: modelFetchTimeoutNanoseconds,
         modelRetryBackoffNanoseconds: modelRetryBackoffNanoseconds
     )
