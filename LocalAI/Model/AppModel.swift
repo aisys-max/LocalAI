@@ -84,10 +84,17 @@ final class AppModel: ObservableObject {
     init(
         backendClient: ChatBackendClient = OpenAICompatibleChatBackendClient(),
         modelCatalogClient: ModelCatalogClient = OpenAICompatibleModelCatalogClient(),
-        persistenceStore: PersistenceStore = SwiftDataPersistenceStore(),
+        // `PersistenceStore` is now `@MainActor` (it wraps a SwiftData
+        // `ModelContext`, which must never cross actor boundaries) — a
+        // default *parameter* value can't call a MainActor-isolated
+        // initializer, since default-argument expressions aren't evaluated
+        // in the enclosing init's isolation. Defaulting to `nil` and
+        // resolving inside the (MainActor) init body sidesteps that.
+        persistenceStore: PersistenceStore? = nil,
         modelFetchTimeoutNanoseconds: UInt64 = 30_000_000_000,
         modelRetryBackoffNanoseconds: UInt64 = 5_000_000_000
     ) {
+        let persistenceStore = persistenceStore ?? SwiftDataPersistenceStore()
         self.backendClient = backendClient
         self.modelCatalogClient = modelCatalogClient
         self.persistenceStore = persistenceStore
