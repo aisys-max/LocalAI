@@ -12,11 +12,11 @@ struct LegalSheetView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(entry.title)
                 .font(AppFont.heading(20))
-                .foregroundColor(theme.text)
+                .foregroundStyle(theme.text)
             ScrollView {
                 Text(entry.body)
                     .font(AppFont.body(14))
-                    .foregroundColor(theme.textMuted)
+                    .foregroundStyle(theme.textMuted)
                     .lineSpacing(4)
             }
             HStack {
@@ -24,7 +24,7 @@ struct LegalSheetView: View {
                 Button(model.strings.done) { model.closeLegal() }
                     .buttonStyle(.borderedProminent)
                     .tint(theme.accent)
-                    .foregroundColor(theme.onAccentText)
+                    .foregroundStyle(theme.onAccentText)
             }
         }
         .padding(20)

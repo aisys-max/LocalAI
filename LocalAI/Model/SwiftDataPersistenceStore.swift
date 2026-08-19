@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// SwiftData-backed `PersistenceStore`. Kept separate from the plain
 /// `Chat`/`ChatMessage` domain structs (rather than making those `@Model`
@@ -107,18 +108,65 @@ final class PersistedAppState {
     }
 }
 
+/// First on-disk schema version. Every future schema change (a new
+/// non-optional column, a renamed/removed field, a new model) should add a
+/// `LocalAISchemaV2` etc. plus a corresponding `MigrationStage` to
+/// `LocalAIMigrationPlan.stages` below, rather than relying on SwiftData's
+/// automatic lightweight migration — lightweight migration only covers
+/// adding new `Optional` attributes (see the Settings-columns comment on
+/// `PersistedAppState` for a case that already required working around
+/// this limit), and silently falls back to an in-memory store on anything
+/// it can't handle, discarding every existing user's Chats.
+enum LocalAISchemaV1: VersionedSchema {
+    static let versionIdentifier = Schema.Version(1, 0, 0)
+    static var models: [any PersistentModel.Type] { [PersistedChat.self, PersistedMessage.self, PersistedAppState.self] }
+}
+
+enum LocalAIMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [LocalAISchemaV1.self] }
+    static var stages: [MigrationStage] { [] }
+}
+
+@MainActor
 final class SwiftDataPersistenceStore: PersistenceStore {
     private let context: ModelContext
+    private static let logger = Logger(subsystem: "com.local.localai", category: "persistence")
 
-    init(container: ModelContainer = SwiftDataPersistenceStore.makeDefaultContainer()) {
-        self.context = ModelContext(container)
+    // Same default-argument-isolation issue as `AppModel.init` — a default
+    // parameter value can't call this (now-MainActor) type's own static
+    // method, so the default resolves inside the init body instead.
+    init(container: ModelContainer? = nil) {
+        self.context = ModelContext(container ?? Self.makeDefaultContainer())
     }
 
+    /// Falls back to an in-memory store (discarding every existing user's
+    /// Chats) if opening/migrating the on-disk store fails — logged here
+    /// specifically, since this is the one failure in this file severe
+    /// enough that it's worth knowing about even without a debugger
+    /// attached (every other failure in this file only loses one write,
+    /// not the whole store).
     private static func makeDefaultContainer() -> ModelContainer {
-        let schema = Schema([PersistedChat.self, PersistedMessage.self, PersistedAppState.self])
+        let schema = Schema(versionedSchema: LocalAISchemaV1.self)
         let configuration = ModelConfiguration(schema: schema)
-        return (try? ModelContainer(for: schema, configurations: [configuration]))
-            ?? (try! ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]))
+        do {
+            return try ModelContainer(for: schema, migrationPlan: LocalAIMigrationPlan.self, configurations: configuration)
+        } catch {
+            logger.error("Failed to open/migrate on-disk store, falling back to in-memory: \(error, privacy: .public)")
+            return try! ModelContainer(for: schema, migrationPlan: LocalAIMigrationPlan.self, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
+        }
+    }
+
+    /// Every write path funnels through here rather than calling
+    /// `context.save()` directly, so a save failure (disk full, store
+    /// corruption) is at least logged instead of silently discarded — the
+    /// in-memory `AppModel` state already changed by the time this runs,
+    /// so there's no user-facing recovery to attempt here, only visibility.
+    private func saveContext() {
+        do {
+            try context.save()
+        } catch {
+            Self.logger.error("Failed to save ModelContext: \(error, privacy: .public)")
+        }
     }
 
     func loadChats() -> [String: Chat] {
@@ -219,7 +267,7 @@ final class SwiftDataPersistenceStore: PersistenceStore {
                 backendRaw: message.backend?.rawValue
             ))
         }
-        try? context.save()
+        saveContext()
     }
 
     func deleteChat(id: String) {
@@ -227,19 +275,19 @@ final class SwiftDataPersistenceStore: PersistenceStore {
             context.delete(existing)
         }
         fetchMessages(chatId: id).forEach { context.delete($0) }
-        try? context.save()
+        saveContext()
     }
 
     func saveCurrentChatId(_ currentChatId: String?) {
         let state = fetchOrCreateAppState()
         state.currentChatId = currentChatId
-        try? context.save()
+        saveContext()
     }
 
     func saveDraft(_ draft: String) {
         let state = fetchOrCreateAppState()
         state.draft = draft
-        try? context.save()
+        saveContext()
     }
 
     func saveSettings(_ settings: PersistedSettings) {
@@ -251,7 +299,7 @@ final class SwiftDataPersistenceStore: PersistenceStore {
         state.appearanceRaw = settings.appearance.rawValue
         state.languageRaw = settings.language.rawValue
         state.retentionPeriodRaw = settings.retentionPeriod.rawValue
-        try? context.save()
+        saveContext()
     }
 
     private func fetchChat(id: String) -> PersistedChat? {

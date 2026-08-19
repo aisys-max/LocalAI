@@ -45,7 +45,7 @@ struct OnboardingView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Capsule().fill(theme.accent))
-                        .foregroundColor(theme.onAccentText)
+                        .foregroundStyle(theme.onAccentText)
                 }
                 .buttonStyle(.plain)
             }

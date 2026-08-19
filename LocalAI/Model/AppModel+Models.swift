@@ -28,7 +28,7 @@ extension AppModel {
                 let models = try await withThrowingTaskGroup(of: [String].self) { group -> [String] in
                     group.addTask { try await client.fetchModels(baseURL: baseURL) }
                     group.addTask {
-                        try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                        try await Task.sleep(for: .nanoseconds(Int64(timeoutNanoseconds)))
                         throw ModelFetchTimeoutError()
                     }
                     defer { group.cancelAll() }
@@ -45,38 +45,36 @@ extension AppModel {
             }
 
             guard !Task.isCancelled else { return resolvedState }
-            await MainActor.run {
-                self.modelListState = resolvedState
-                if case .loaded(let models) = resolvedState {
-                    // Only the persisted selection gets validated against the
-                    // fetched list (and only once, ever) — a Model the user
-                    // has since picked explicitly via selectModel() is never
-                    // second-guessed here, no matter what the list contains.
-                    if let pending = self.modelPendingValidation, self.model == pending, !models.contains(pending) {
-                        self.model = nil
-                    } else if self.model == nil {
-                        self.model = models.first
-                    }
-                    self.modelPendingValidation = nil
-                    self.persistSettings()
-                    // Catches up a Greeting comparison that `goChat()` had
-                    // to skip because `model` was still nil at the time
-                    // (see `reconcileGreetingForCurrentChat()`'s own nil
-                    // guard) — without this, a fetch that resolves after
-                    // the user has already returned to Chat (slower
-                    // networks, e.g. a remote Backend over Tailscale) would
-                    // otherwise never get a chance to update the Greeting.
-                    // Gated on `screen == .chat`: reconciliation is only
-                    // ever meant to happen on return to Chat, not while
-                    // still browsing Settings/Model Picker — a fetch that
-                    // resolves *before* the user has returned (the common
-                    // case on a fast/local network) must wait for `goChat()`
-                    // the same as always, so flipping Backend/Model back and
-                    // forth before returning still doesn't accumulate
-                    // Greetings the user never actually confirmed.
-                    if self.screen == .chat {
-                        self.reconcileGreetingForCurrentChat()
-                    }
+            modelListState = resolvedState
+            if case .loaded(let models) = resolvedState {
+                // Only the persisted selection gets validated against the
+                // fetched list (and only once, ever) — a Model the user
+                // has since picked explicitly via selectModel() is never
+                // second-guessed here, no matter what the list contains.
+                if let pending = modelPendingValidation, model == pending, !models.contains(pending) {
+                    model = nil
+                } else if model == nil {
+                    model = models.first
+                }
+                modelPendingValidation = nil
+                persistSettings()
+                // Catches up a Greeting comparison that `goChat()` had
+                // to skip because `model` was still nil at the time
+                // (see `reconcileGreetingForCurrentChat()`'s own nil
+                // guard) — without this, a fetch that resolves after
+                // the user has already returned to Chat (slower
+                // networks, e.g. a remote Backend over Tailscale) would
+                // otherwise never get a chance to update the Greeting.
+                // Gated on `screen == .chat`: reconciliation is only
+                // ever meant to happen on return to Chat, not while
+                // still browsing Settings/Model Picker — a fetch that
+                // resolves *before* the user has returned (the common
+                // case on a fast/local network) must wait for `goChat()`
+                // the same as always, so flipping Backend/Model back and
+                // forth before returning still doesn't accumulate
+                // Greetings the user never actually confirmed.
+                if screen == .chat {
+                    reconcileGreetingForCurrentChat()
                 }
             }
             return resolvedState
@@ -107,21 +105,17 @@ extension AppModel {
                 guard !Task.isCancelled else { return }
                 switch state {
                 case .loaded:
-                    await MainActor.run {
-                        self.modelRetryLoopTask = nil
-                        self.isRetryingModels = false
-                    }
+                    modelRetryLoopTask = nil
+                    isRetryingModels = false
                     return
                 case .failed, .timedOut:
-                    try? await Task.sleep(nanoseconds: backoffNanoseconds)
+                    try? await Task.sleep(for: .nanoseconds(Int64(backoffNanoseconds)))
                 case .loading:
                     // Unreachable — loadModels()'s task always resolves to a
                     // terminal state — but clear the task reference defensively
                     // so isRetryingModels can't get stuck true if it ever does.
-                    await MainActor.run {
-                        self.modelRetryLoopTask = nil
-                        self.isRetryingModels = false
-                    }
+                    modelRetryLoopTask = nil
+                    isRetryingModels = false
                     return
                 }
             }
