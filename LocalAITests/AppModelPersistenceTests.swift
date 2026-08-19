@@ -205,16 +205,20 @@ struct AppModelPersistenceTests {
         store.currentChatId = "c1"
 
         let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m1"]), persistenceStore: store)
-        // Captured after the synchronous launch bootstrap (which persists a
-        // greeting for this legacy Chat) — what's under test here is that
-        // the async interruption-detection pass, resolved below, adds no
-        // further save for a Chat that's already correctly terminated.
-        let saveCountAfterLaunch = store.saveChatCallCount
+        // Let the launch Model-list fetch resolve first — it backfills this
+        // legacy Chat's bootstrapped Greeting (created before a Model was
+        // known) via `reconcileGreetingForCurrentChat()`, which is a
+        // legitimate, expected save unrelated to what's under test here.
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        // Captured only now: what's under test is that the async
+        // interruption-detection pass, resolved below, adds no further
+        // save for a Chat that's already correctly terminated.
+        let saveCountAfterLoad = store.saveChatCallCount
         try? await Task.sleep(nanoseconds: 20_000_000)
         let realMessages = model.chats["c1"]?.messages.filter { !$0.isGreeting } ?? []
 
         #expect(realMessages.map(\.id) == ["m1", "m2"])
-        #expect(store.saveChatCallCount == saveCountAfterLaunch)
+        #expect(store.saveChatCallCount == saveCountAfterLoad)
     }
 
     @Test func launchDoesNotTouchAChatThatIsNotCurrentlyOpen() async {

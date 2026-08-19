@@ -33,18 +33,23 @@ extension AppModel {
     }
 
     /// Called from `goChat()` — the single "return to Chat" choke point —
-    /// and once at launch (for the case where the app is killed mid-Settings
-    /// before the user ever taps back) to keep the current Chat's Greeting
-    /// history an accurate record of which Backend/Model actually produced
-    /// each stretch of conversation. Compares the currently selected
-    /// (Backend, Model) against the pair recorded on the Chat's most recent
-    /// Greeting (not its full history — switching back to an earlier
-    /// Backend/Model still counts as a change). No-op if they match, if the
-    /// Chat has no Greeting at all (shouldn't happen post-
-    /// `bootstrapMissingGreetings()`), or if no Model is selected yet —
-    /// `selectBackend(_:)` clears `model` before a fresh fetch resolves, and
-    /// reconciling against that transient `nil` would permanently bake a
-    /// "no model" Greeting into history for what's normally a brief window.
+    /// once at launch (for the case where the app is killed mid-Settings
+    /// before the user ever taps back), and from `loadModels()`'s
+    /// successful-resolution branch, gated on `screen == .chat` there (a
+    /// Model-list fetch kicked off by a Backend/Model switch can resolve
+    /// after the user has already returned to Chat — that catch-up path is
+    /// what actually keeps the Greeting from going stale on a slow/remote
+    /// network). Keeps the current Chat's Greeting history an accurate
+    /// record of which Backend/Model actually produced each stretch of
+    /// conversation. Compares the currently selected (Backend, Model)
+    /// against the pair recorded on the Chat's most recent Greeting (not
+    /// its full history — switching back to an earlier Backend/Model still
+    /// counts as a change). No-op if they match, if the Chat has no
+    /// Greeting at all (shouldn't happen post-`bootstrapMissingGreetings()`),
+    /// or if no Model is selected yet — `selectBackend(_:)` clears `model`
+    /// before a fresh fetch resolves, and reconciling against that
+    /// transient `nil` would permanently bake a "no model" Greeting into
+    /// history for what's normally a brief window.
     func reconcileGreetingForCurrentChat() {
         guard let chatId = currentChatId, var chat = chats[chatId],
               let lastGreetingIndex = chat.messages.lastIndex(where: { $0.isGreeting }),
@@ -62,27 +67,44 @@ extension AppModel {
             persistChat(chatId)
             return
         }
+
+        if lastGreeting.model == nil && lastBackend == backend {
+            // The Model wasn't known yet when this Greeting was created —
+            // e.g. bootstrapped at launch, or written by `goChat()` while a
+            // Backend switch's async Model fetch was still in flight. Now
+            // that a Model is known (this function's own top-level guard
+            // requires `model != nil`) and the Backend hasn't also changed,
+            // this regenerates the Greeting in place rather than treating
+            // "we now know the Model" as a real switch worth logging —
+            // otherwise every Chat bootstrapped/greeted before its first
+            // Model resolves would get a spurious extra Greeting the
+            // moment that resolution lands.
+            chat.messages[lastGreetingIndex] = greetingMessage(createdAt: lastGreeting.createdAt)
+            chats[chatId] = chat
+            persistChat(chatId)
+            return
+        }
         guard lastBackend != backend || lastGreeting.model != model else { return }
 
         let newGreeting = greetingMessage(createdAt: Date())
-        // "Still unstarted" is judged from the Chat's current Messages only
-        // — not its full Greeting history. A Chat that had its one real
-        // Message swipe-deleted (via ChatView) after multiple Greetings had
-        // already accumulated does fall back to replacing, losing that
-        // Greeting history — a known, accepted trade-off (matches the
-        // original #39 spec: switching Backend/Model on a Chat with zero
-        // real Messages right now always replaces, unconditionally).
-        let hasHistory = chat.messages.contains(where: { !$0.isGreeting })
-        if hasHistory {
-            // Real conversation already happened under the old Greeting —
-            // append, so it stays in place as a marker of what was true at
-            // the time, rather than being overwritten.
+        // Append-vs-replace is judged from what happened *since the last
+        // Greeting specifically* — not the Chat's full history. A Chat can
+        // pick up several Greetings over its lifetime (one per switch that
+        // actually had a real Message after it); switching again right
+        // after an earlier switch, with nothing sent in between, updates
+        // that same last Greeting in place instead of piling up an entry
+        // for a switch nobody actually used. This is also what makes a
+        // still-fully-unstarted Chat behave as a special case of the same
+        // rule (its one Greeting has nothing after it either), rather than
+        // needing its own branch.
+        let messagesSinceLastGreeting = chat.messages[(lastGreetingIndex + 1)...]
+        if messagesSinceLastGreeting.contains(where: { !$0.isGreeting }) {
+            // Real conversation happened since the last Greeting — append,
+            // so it stays in place as a marker of what was true at the
+            // time, rather than being overwritten.
             chat.messages.append(newGreeting)
         } else {
-            // Still unstarted — an empty Chat only ever shows one, current
-            // Greeting, no matter how many times Backend/Model is flipped
-            // before the user sends anything.
-            chat.messages = [newGreeting]
+            chat.messages[lastGreetingIndex] = newGreeting
         }
         chat.snippet = String(newGreeting.text.prefix(60))
         chats[chatId] = chat

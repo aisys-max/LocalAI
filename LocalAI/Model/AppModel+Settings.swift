@@ -80,20 +80,22 @@ extension AppModel {
     /// in-session, no relaunch needed. Reuses `deleteChats(in: .all)` for
     /// the Chat wipe rather than reimplementing it.
     ///
-    /// Stops any in-flight Model-list work first (`stopModelRetryLoop()`
-    /// cancels both the retry loop and a bare `loadModels()` fetch): without
-    /// this, a fetch already in flight for the *old* Backend could resolve
-    /// after the reset and silently re-persist a non-default Model, making
-    /// the reset not actually final. `modelListState` and `modelPendingValidation`
-    /// are reset alongside it so nothing stale carries into onboarding.
-    /// A `streamReply` Task from an in-flight Generation isn't (and can't be
-    /// straightforwardly be) cancelled here — no reference to it is kept
-    /// past `sendMessage()`/`regenerate()` returning — but it's harmless:
-    /// every mutation it can still make (`persistChat`, `appendReplyChunk`,
-    /// `appendAssistantMessage`) already no-ops once its Chat is gone from
-    /// `chats`, which `deleteChats(in: .all)` below guarantees.
+    /// Stops any in-flight Model-list work first (`stopAllModelWork()`
+    /// cancels both the retry loop and a bare `loadModels()` fetch — unlike
+    /// plain `stopModelRetryLoop()`, which leaves a bare fetch to resolve):
+    /// without this, a fetch already in flight for the *old* Backend could
+    /// resolve after the reset and silently re-persist a non-default Model,
+    /// making the reset not actually final. `modelListState` and
+    /// `modelPendingValidation` are reset alongside it so nothing stale
+    /// carries into onboarding. A `streamReply` Task from an in-flight
+    /// Generation isn't (and can't be straightforwardly be) cancelled here
+    /// — no reference to it is kept past `sendMessage()`/`regenerate()`
+    /// returning — but it's harmless: every mutation it can still make
+    /// (`persistChat`, `appendReplyChunk`, `appendAssistantMessage`)
+    /// already no-ops once its Chat is gone from `chats`, which
+    /// `deleteChats(in: .all)` below guarantees.
     func resetToDefault() {
-        stopModelRetryLoop()
+        stopAllModelWork()
         generating = false
         copyResetTask?.cancel()
         copiedId = nil
@@ -111,7 +113,7 @@ extension AppModel {
 
         // Matches AppModel.init, which always kicks off a fetch for the
         // (default) Backend at the end — without this, `modelListState`
-        // just sits at whatever `stopModelRetryLoop()` left it/`.loading`
+        // just sits at whatever `stopAllModelWork()` left it/`.loading`
         // forever, since onboarding's Backend step only calls
         // `selectBackend(_:)` (which would otherwise trigger this) if the
         // user taps a card, not when the already-selected default is kept.
