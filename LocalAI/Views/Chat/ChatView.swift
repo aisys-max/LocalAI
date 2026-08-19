@@ -6,45 +6,31 @@ struct ChatView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 8) {
-                HStack {
-                    Spacer()
-                    Text(model.strings.appName)
-                        .font(AppFont.heading(17))
-                        .foregroundStyle(theme.text)
-                    Spacer()
-                    IconButtonView(title: model.strings.deleteConversations, systemName: "trash", theme: theme) {
-                        model.showDeleteRangeDialog = true
-                    }
-                    .confirmationDialog(
-                        model.strings.deleteRangeDialogTitle,
-                        isPresented: $model.showDeleteRangeDialog,
-                        titleVisibility: .visible
-                    ) {
-                        Button(model.strings.deleteRangeToday, role: .destructive) { deleteChatsAndStartFresh(in: .today) }
-                        Button(model.strings.deleteRangeSinceYesterday, role: .destructive) { deleteChatsAndStartFresh(in: .sinceYesterday) }
-                        Button(model.strings.deleteRangeThisWeek, role: .destructive) { deleteChatsAndStartFresh(in: .thisWeek) }
-                        Button(model.strings.deleteRangeThisMonth, role: .destructive) { deleteChatsAndStartFresh(in: .thisMonth) }
-                        Button(model.strings.deleteRangeAll, role: .destructive) { model.showDeleteAllConfirmation = true }
-                    }
-                    IconButtonView(title: model.strings.settingsTitle, systemName: "gearshape", theme: theme) {
-                        model.goSettings()
-                    }
+            HStack {
+                Spacer()
+                Text(model.strings.appName)
+                    .font(AppFont.heading(17))
+                    .foregroundStyle(theme.text)
+                Spacer()
+                IconButtonView(title: model.strings.deleteConversations, systemName: "trash", theme: theme) {
+                    model.showDeleteRangeDialog = true
                 }
-                .padding(.horizontal, 14)
-
-                Button {
-                    model.openModelPicker(from: .chat)
-                } label: {
-                    Text("\(model.model ?? model.strings.noModelSelected) · \(model.backend.label)")
-                        .font(AppFont.body(11.5, weight: .semibold))
-                        .foregroundStyle(theme.textMuted)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(theme.surface2))
+                .confirmationDialog(
+                    model.strings.deleteRangeDialogTitle,
+                    isPresented: $model.showDeleteRangeDialog,
+                    titleVisibility: .visible
+                ) {
+                    Button(model.strings.deleteRangeToday, role: .destructive) { deleteChatsAndStartFresh(in: .today) }
+                    Button(model.strings.deleteRangeSinceYesterday, role: .destructive) { deleteChatsAndStartFresh(in: .sinceYesterday) }
+                    Button(model.strings.deleteRangeThisWeek, role: .destructive) { deleteChatsAndStartFresh(in: .thisWeek) }
+                    Button(model.strings.deleteRangeThisMonth, role: .destructive) { deleteChatsAndStartFresh(in: .thisMonth) }
+                    Button(model.strings.deleteRangeAll, role: .destructive) { model.showDeleteAllConfirmation = true }
                 }
-                .buttonStyle(.plain)
+                IconButtonView(title: model.strings.settingsTitle, systemName: "gearshape", theme: theme) {
+                    model.goSettings()
+                }
             }
+            .padding(.horizontal, 14)
             .padding(.top, 20)
             .padding(.bottom, 10)
 

@@ -21,6 +21,8 @@ struct AppModelChatTests {
 
         #expect(model.generating == false)
         #expect(model.chats[chatId]?.messages.last?.text == "hello there")
+        #expect(model.chats[chatId]?.messages.last?.model == "test-model")
+        #expect(model.chats[chatId]?.messages.last?.backend == .ollama)
     }
 
     @Test func sendMessageAssemblesReplyFromStreamedChunks() async {
