@@ -62,7 +62,7 @@ struct OpenAICompatibleChatBackendClient: ChatBackendClient {
     }
 }
 
-enum OpenAICompatibleChatBackendClientError: Error {
+enum OpenAICompatibleChatBackendClientError: Error, Equatable {
     case badResponse(statusCode: Int?)
 }
 
