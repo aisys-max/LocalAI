@@ -88,13 +88,11 @@ struct ChatView: View {
                     // Settings/Model Picker. Scrolling here on every
                     // (re)appearance is what makes returning to Chat land
                     // back on the latest message instead of the top.
-                    // Dispatched to the next run loop turn — right on
-                    // `onAppear`, the List may not have finished
+                    // Deferred to the next run loop turn via a Task — right
+                    // on `onAppear`, the List may not have finished
                     // materializing its rows yet, so `proxy.scrollTo` can
                     // silently target a row that isn't laid out.
-                    DispatchQueue.main.async {
-                        scrollToBottom(proxy)
-                    }
+                    Task { scrollToBottom(proxy) }
                 }
             }
 

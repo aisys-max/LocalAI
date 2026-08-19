@@ -20,7 +20,7 @@ struct ModelPickerView: View {
 
                     Text(model.backend.description(model.language))
                         .font(AppFont.body(12.5))
-                        .foregroundColor(theme.textMuted)
+                        .foregroundStyle(theme.textMuted)
                         .lineSpacing(2)
                         .padding(.vertical, 16)
                         .padding(.horizontal, 4)
@@ -44,7 +44,7 @@ struct ModelPickerView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
                             .background(Capsule().fill(theme.accent))
-                            .foregroundColor(theme.onAccentText)
+                            .foregroundStyle(theme.onAccentText)
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 6)
