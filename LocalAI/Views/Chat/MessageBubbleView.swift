@@ -7,13 +7,30 @@ struct MessageBubbleView: View {
 
     private var isUser: Bool { message.role == .user }
 
+    /// The (Model, Backend) this specific Message was actually generated
+    /// with — frozen at the time, same as `ChatMessage.backend`'s Greeting
+    /// usage — not the currently selected one. Falls back to
+    /// `noModelSelected` for a Message generated (or, for a legacy Message,
+    /// persisted) with no Model, and omits the Backend half for a Message
+    /// that predates `ChatMessage.backend`.
+    private var modelBackendLabel: String {
+        let modelText = message.model ?? model.strings.noModelSelected
+        guard let backend = message.backend else { return modelText }
+        return "\(modelText) · \(backend.label)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if !isUser, let modelName = message.model {
-                Text(modelName.uppercased())
-                    .font(AppFont.body(10.5, weight: .bold))
-                    .tracking(0.3)
-                    .foregroundColor(theme.accent2)
+            if !isUser {
+                Button {
+                    model.openModelPicker(from: .chat)
+                } label: {
+                    Text(modelBackendLabel.uppercased())
+                        .font(AppFont.body(10.5, weight: .bold))
+                        .tracking(0.3)
+                        .foregroundColor(theme.accent2)
+                }
+                .buttonStyle(.plain)
             }
 
             ForEach(MessageParsing.blocks(from: message.text)) { block in

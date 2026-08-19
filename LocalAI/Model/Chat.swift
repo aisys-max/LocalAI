@@ -31,10 +31,14 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     var text: String
     var model: String?
-    /// Only ever set on a Greeting (see below) — the Backend it was worded
-    /// against, alongside `model`, so `AppModel.goChat()` can tell whether
-    /// the currently selected (Backend, Model) still matches the Chat's most
-    /// recent Greeting without re-parsing its text.
+    /// The Backend that actually generated this Message, alongside `model`
+    /// — frozen at the time, like `model`. Set on both Greetings (so
+    /// `AppModel.goChat()` can tell whether the currently selected
+    /// (Backend, Model) still matches the Chat's most recent Greeting
+    /// without re-parsing its text) and real generated replies (so
+    /// `MessageBubbleView` can show which Backend/Model produced each
+    /// specific reply). Nil for a user Message, or a Message persisted
+    /// before this field existed.
     var backend: Backend?
     /// The synthetic "hi" message a Chat opens with — worded against
     /// whichever Backend/Model was selected at the moment it was shown, then

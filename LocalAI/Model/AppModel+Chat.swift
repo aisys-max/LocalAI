@@ -226,7 +226,7 @@ extension AppModel {
     }
 
     private func beginReply(chatId: String, messageId: String, chunk: String) {
-        appendAssistantMessage(chatId: chatId, message: ChatMessage(id: messageId, role: .assistant, text: chunk, model: model))
+        appendAssistantMessage(chatId: chatId, message: ChatMessage(id: messageId, role: .assistant, text: chunk, model: model, backend: backend))
     }
 
     private func appendReplyChunk(chatId: String, messageId: String, chunk: String) {
