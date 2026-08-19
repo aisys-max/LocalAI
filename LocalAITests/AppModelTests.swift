@@ -425,7 +425,34 @@ struct AppModelChatTests {
         #expect(greetings.first?.backend == .ollama)
     }
 
-    @Test func deletingTheOnlyRealMessageThenSwitchingBackendStillAppendsRatherThanWipingPriorGreetings() {
+    @Test func repeatedlySwitchingBackendModelOnAStillEmptyChatNeverAccumulatesGreetings() {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m2")
+        model.goChat()
+
+        model.selectBackend(.ollama)
+        model.selectModel("m3")
+        model.goChat()
+
+        model.selectBackend(.lmstudio)
+        model.selectModel("m4")
+        model.goChat()
+
+        // Every switch replaced, never appended — exactly one Greeting,
+        // matching the current (latest) Backend/Model.
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 1)
+        #expect(greetings.first?.backend == .lmstudio)
+        #expect(greetings.first?.model == "m4")
+    }
+
+    @Test func deletingTheOnlyRealMessageThenSwitchingBackendFallsBackToReplacing() {
         let store = FakePersistenceStore()
         let model = makeTestAppModel(persistenceStore: store)
         model.selectModel("m1")
@@ -441,15 +468,19 @@ struct AppModelChatTests {
 
         model.deleteMessage(chatId: chatId, messageId: "u1")
         // Now: [greeting(ollama/m1), greeting(lmstudio/m2)] — zero real
-        // Messages, but this Chat has real history, unlike a pristine one.
+        // Messages right now, so this Chat is judged "still unstarted"
+        // again, same as a pristine one — a known, accepted trade-off
+        // (matches the original #39 spec: the decision is based on the
+        // Chat's current Messages, not its full Greeting history).
 
         model.selectBackend(.ollama)
         model.selectModel("m1")
         model.goChat()
 
         let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
-        #expect(greetings.count == 3)
-        #expect(greetings.map(\.backend) == [.ollama, .lmstudio, .ollama])
+        #expect(greetings.count == 1)
+        #expect(greetings.first?.backend == .ollama)
+        #expect(greetings.first?.model == "m1")
     }
 
     @Test func launchReconcilesTheCurrentChatsGreetingWithoutGoingThroughGoChat() {
