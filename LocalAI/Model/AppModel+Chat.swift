@@ -87,24 +87,24 @@ extension AppModel {
         guard lastBackend != backend || lastGreeting.model != model else { return }
 
         let newGreeting = greetingMessage(createdAt: Date())
-        // "Still unstarted" is judged from the Chat's current Messages only
-        // — not its full Greeting history. A Chat that had its one real
-        // Message swipe-deleted (via ChatView) after multiple Greetings had
-        // already accumulated does fall back to replacing, losing that
-        // Greeting history — a known, accepted trade-off (matches the
-        // original #39 spec: switching Backend/Model on a Chat with zero
-        // real Messages right now always replaces, unconditionally).
-        let hasHistory = chat.messages.contains(where: { !$0.isGreeting })
-        if hasHistory {
-            // Real conversation already happened under the old Greeting —
-            // append, so it stays in place as a marker of what was true at
-            // the time, rather than being overwritten.
+        // Append-vs-replace is judged from what happened *since the last
+        // Greeting specifically* — not the Chat's full history. A Chat can
+        // pick up several Greetings over its lifetime (one per switch that
+        // actually had a real Message after it); switching again right
+        // after an earlier switch, with nothing sent in between, updates
+        // that same last Greeting in place instead of piling up an entry
+        // for a switch nobody actually used. This is also what makes a
+        // still-fully-unstarted Chat behave as a special case of the same
+        // rule (its one Greeting has nothing after it either), rather than
+        // needing its own branch.
+        let messagesSinceLastGreeting = chat.messages[(lastGreetingIndex + 1)...]
+        if messagesSinceLastGreeting.contains(where: { !$0.isGreeting }) {
+            // Real conversation happened since the last Greeting — append,
+            // so it stays in place as a marker of what was true at the
+            // time, rather than being overwritten.
             chat.messages.append(newGreeting)
         } else {
-            // Still unstarted — an empty Chat only ever shows one, current
-            // Greeting, no matter how many times Backend/Model is flipped
-            // before the user sends anything.
-            chat.messages = [newGreeting]
+            chat.messages[lastGreetingIndex] = newGreeting
         }
         chat.snippet = String(newGreeting.text.prefix(60))
         chats[chatId] = chat
