@@ -31,12 +31,18 @@ struct ChatMessage: Identifiable {
     let role: MessageRole
     var text: String
     var model: String?
+    /// Only ever set on a Greeting (see below) — the Backend it was worded
+    /// against, alongside `model`, so `AppModel.goChat()` can tell whether
+    /// the currently selected (Backend, Model) still matches the Chat's most
+    /// recent Greeting without re-parsing its text.
+    var backend: Backend?
     /// The synthetic "hi" message a Chat opens with — worded against
     /// whichever Backend/Model was selected at the moment it was shown, then
     /// persisted like any other Message (see `AppModel.greetingMessage`).
     /// Unlike a real generated reply, its identity isn't reused across
-    /// occurrences — a Chat can accumulate more than one over its lifetime
-    /// as the Backend/Model changes underneath it.
+    /// occurrences — a Chat accumulates a new one each time `goChat()` finds
+    /// the Backend/Model has changed since the Chat's last Greeting (see
+    /// `AppModel.reconcileGreetingForCurrentChat()`).
     var isGreeting: Bool = false
     /// Orders Messages within a Chat after a save/reload round-trip — `id`
     /// alone isn't sortable (assistant message ids are random UUIDs).

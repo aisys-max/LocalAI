@@ -173,6 +173,19 @@ struct SwiftDataPersistenceStoreTests {
         #expect(messages.first { $0.id == "m1" }?.isGreeting == false)
     }
 
+    @Test func greetingBackendRoundTripsThroughSaveAndLoad() {
+        let store = SwiftDataPersistenceStore(container: makeInMemoryContainer())
+        store.saveChat(Chat(id: "c1", createdAt: Date(), title: "t", snippet: "s", messages: [
+            ChatMessage(id: "g1", role: .assistant, text: "hi", backend: .lmstudio, isGreeting: true),
+            ChatMessage(id: "m1", role: .user, text: "hello")
+        ]))
+
+        let messages = store.loadChats()["c1"]?.messages ?? []
+
+        #expect(messages.first { $0.id == "g1" }?.backend == .lmstudio)
+        #expect(messages.first { $0.id == "m1" }?.backend == nil)
+    }
+
     /// `PersistedMessage.isGreeting` is `Optional` for the same lightweight-
     /// migration reason as `PersistedAppState`'s Settings columns above — a
     /// row written before this attribute existed loads with a nil column,
@@ -202,7 +215,7 @@ struct SwiftDataPersistenceStoreTests {
 
         // Simulate corrupted/unrecognized role data landing directly in the store.
         let context = ModelContext(container)
-        context.insert(PersistedMessage(id: "m2", chatId: "c1", roleRaw: "not-a-real-role", text: "corrupt", model: nil, createdAt: Date(), isGreeting: false))
+        context.insert(PersistedMessage(id: "m2", chatId: "c1", roleRaw: "not-a-real-role", text: "corrupt", model: nil, createdAt: Date(), isGreeting: false, backendRaw: nil))
         try? context.save()
 
         let messages = store.loadChats()["c1"]?.messages ?? []
