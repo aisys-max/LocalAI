@@ -78,6 +78,24 @@ struct ChatView: View {
                 .onChange(of: model.generating) { _, _ in
                     scrollToBottom(proxy)
                 }
+                .onAppear {
+                    // RootView rebuilds ChatView from scratch on every
+                    // screen switch (no persistent navigation stack), so
+                    // this List always mounts scrolled to the top — the
+                    // `onChange`s above only fire for a count/generating
+                    // change that happens *during* this mount's lifetime,
+                    // not one that already happened while the user was in
+                    // Settings/Model Picker. Scrolling here on every
+                    // (re)appearance is what makes returning to Chat land
+                    // back on the latest message instead of the top.
+                    // Dispatched to the next run loop turn — right on
+                    // `onAppear`, the List may not have finished
+                    // materializing its rows yet, so `proxy.scrollTo` can
+                    // silently target a row that isn't laid out.
+                    DispatchQueue.main.async {
+                        scrollToBottom(proxy)
+                    }
+                }
             }
 
             InputBarView(model: model, theme: theme)

@@ -65,13 +65,14 @@ extension AppModel {
         guard lastBackend != backend || lastGreeting.model != model else { return }
 
         let newGreeting = greetingMessage(createdAt: Date())
-        // "Still unstarted" requires more than just "no real Messages right
-        // now" — a Chat that already accumulated more than one Greeting has
-        // real history to preserve even if its one real Message was since
-        // deleted (via ChatView's swipe-to-delete), so it must keep
-        // appending, not fall back to replacing and wiping that history.
+        // "Still unstarted" is judged from the Chat's current Messages only
+        // — not its full Greeting history. A Chat that had its one real
+        // Message swipe-deleted (via ChatView) after multiple Greetings had
+        // already accumulated does fall back to replacing, losing that
+        // Greeting history — a known, accepted trade-off (matches the
+        // original #39 spec: switching Backend/Model on a Chat with zero
+        // real Messages right now always replaces, unconditionally).
         let hasHistory = chat.messages.contains(where: { !$0.isGreeting })
-            || chat.messages.filter({ $0.isGreeting }).count > 1
         if hasHistory {
             // Real conversation already happened under the old Greeting —
             // append, so it stays in place as a marker of what was true at
