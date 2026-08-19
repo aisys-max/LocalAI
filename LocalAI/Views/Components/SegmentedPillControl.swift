@@ -12,16 +12,20 @@ struct SegmentedPillControl<Item: Identifiable>: View {
     var body: some View {
         HStack(spacing: 4) {
             ForEach(items) { item in
-                Text(label(item))
-                    .font(AppFont.body(13, weight: .semibold))
-                    .foregroundColor(isSelected(item) ? theme.onAccentText : theme.text)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule().fill(isSelected(item) ? theme.accent : Color.clear)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { onSelect(item) }
+                Button {
+                    onSelect(item)
+                } label: {
+                    Text(label(item))
+                        .font(AppFont.body(13, weight: .semibold))
+                        .foregroundStyle(isSelected(item) ? theme.onAccentText : theme.text)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(isSelected(item) ? theme.accent : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(4)

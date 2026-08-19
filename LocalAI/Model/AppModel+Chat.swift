@@ -39,75 +39,20 @@ extension AppModel {
     /// Model-list fetch kicked off by a Backend/Model switch can resolve
     /// after the user has already returned to Chat — that catch-up path is
     /// what actually keeps the Greeting from going stale on a slow/remote
-    /// network). Keeps the current Chat's Greeting history an accurate
-    /// record of which Backend/Model actually produced each stretch of
-    /// conversation. Compares the currently selected (Backend, Model)
-    /// against the pair recorded on the Chat's most recent Greeting (not
-    /// its full history — switching back to an earlier Backend/Model still
-    /// counts as a change). No-op if they match, if the Chat has no
-    /// Greeting at all (shouldn't happen post-`bootstrapMissingGreetings()`),
-    /// or if no Model is selected yet — `selectBackend(_:)` clears `model`
-    /// before a fresh fetch resolves, and reconciling against that
-    /// transient `nil` would permanently bake a "no model" Greeting into
-    /// history for what's normally a brief window.
+    /// network). The actual append-vs-replace-vs-backfill decision lives in
+    /// `reconcileGreeting(in:backend:model:now:makeGreeting:)`
+    /// (`GreetingReconciliation.swift`) — this is just the AppModel-side
+    /// wiring: look up the current Chat, hand it to that decision, and
+    /// write back/persist only if something actually changed.
     func reconcileGreetingForCurrentChat() {
-        guard let chatId = currentChatId, var chat = chats[chatId],
-              let lastGreetingIndex = chat.messages.lastIndex(where: { $0.isGreeting }),
-              model != nil else { return }
-        let lastGreeting = chat.messages[lastGreetingIndex]
-
-        guard let lastBackend = lastGreeting.backend else {
-            // Predates the `backend` field — there's no way to tell whether
-            // a switch actually happened, so this backfills the field in
-            // place rather than guessing at history. Matches
-            // `bootstrapMissingGreetings()`'s own rule: only ever add
-            // missing information, never rewrite what's already recorded.
-            chat.messages[lastGreetingIndex].backend = backend
-            chats[chatId] = chat
-            persistChat(chatId)
-            return
-        }
-
-        if lastGreeting.model == nil && lastBackend == backend {
-            // The Model wasn't known yet when this Greeting was created —
-            // e.g. bootstrapped at launch, or written by `goChat()` while a
-            // Backend switch's async Model fetch was still in flight. Now
-            // that a Model is known (this function's own top-level guard
-            // requires `model != nil`) and the Backend hasn't also changed,
-            // this regenerates the Greeting in place rather than treating
-            // "we now know the Model" as a real switch worth logging —
-            // otherwise every Chat bootstrapped/greeted before its first
-            // Model resolves would get a spurious extra Greeting the
-            // moment that resolution lands.
-            chat.messages[lastGreetingIndex] = greetingMessage(createdAt: lastGreeting.createdAt)
-            chats[chatId] = chat
-            persistChat(chatId)
-            return
-        }
-        guard lastBackend != backend || lastGreeting.model != model else { return }
-
-        let newGreeting = greetingMessage(createdAt: Date())
-        // Append-vs-replace is judged from what happened *since the last
-        // Greeting specifically* — not the Chat's full history. A Chat can
-        // pick up several Greetings over its lifetime (one per switch that
-        // actually had a real Message after it); switching again right
-        // after an earlier switch, with nothing sent in between, updates
-        // that same last Greeting in place instead of piling up an entry
-        // for a switch nobody actually used. This is also what makes a
-        // still-fully-unstarted Chat behave as a special case of the same
-        // rule (its one Greeting has nothing after it either), rather than
-        // needing its own branch.
-        let messagesSinceLastGreeting = chat.messages[(lastGreetingIndex + 1)...]
-        if messagesSinceLastGreeting.contains(where: { !$0.isGreeting }) {
-            // Real conversation happened since the last Greeting — append,
-            // so it stays in place as a marker of what was true at the
-            // time, rather than being overwritten.
-            chat.messages.append(newGreeting)
-        } else {
-            chat.messages[lastGreetingIndex] = newGreeting
-        }
-        chat.snippet = String(newGreeting.text.prefix(60))
-        chats[chatId] = chat
+        guard let chatId = currentChatId, let chat = chats[chatId] else { return }
+        guard case .updated(let updatedChat) = reconcileGreeting(
+            in: chat,
+            backend: backend,
+            model: model,
+            makeGreeting: { self.greetingMessage(createdAt: $0) }
+        ) else { return }
+        chats[chatId] = updatedChat
         persistChat(chatId)
     }
 
@@ -223,28 +168,22 @@ extension AppModel {
             var started = false
             do {
                 for try await chunk in backendClient.generateReply(chatId: chatId, model: model, messages: messages, baseURL: currentServerURL, delayNanoseconds: delayNanoseconds) {
-                    await MainActor.run {
-                        if started {
-                            self.appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
-                        } else {
-                            self.beginReply(chatId: chatId, messageId: assistantId, chunk: chunk)
-                            started = true
-                        }
+                    if started {
+                        appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
+                    } else {
+                        beginReply(chatId: chatId, messageId: assistantId, chunk: chunk)
+                        started = true
                     }
                 }
             } catch {
-                await MainActor.run {
-                    self.appendFailureMessage(chatId: chatId, error: error)
-                }
+                appendFailureMessage(chatId: chatId, error: error)
             }
             // One save for the whole Generation, here at the end — not per
             // chunk (`appendReplyChunk`/`beginReply` don't persist), so an
             // app kill mid-stream never leaves a partial assistant Message
             // on disk.
-            await MainActor.run {
-                self.generating = false
-                self.persistChat(chatId)
-            }
+            generating = false
+            persistChat(chatId)
         }
     }
 
@@ -283,10 +222,8 @@ extension AppModel {
         copiedId = id
         copyResetTask?.cancel()
         copyResetTask = Task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await MainActor.run {
-                if self.copiedId == id { self.copiedId = nil }
-            }
+            try? await Task.sleep(for: .seconds(1.5))
+            if copiedId == id { copiedId = nil }
         }
     }
 

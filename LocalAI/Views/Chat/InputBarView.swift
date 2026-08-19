@@ -12,7 +12,7 @@ struct InputBarView: View {
         HStack(spacing: 8) {
             TextField(model.strings.inputPlaceholder, text: $model.draft, axis: .vertical)
                 .font(AppFont.body(15))
-                .foregroundColor(theme.text)
+                .foregroundStyle(theme.text)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 9)
                 .background(
@@ -22,15 +22,20 @@ struct InputBarView: View {
                 )
                 .onSubmit { model.sendMessage() }
 
-            Button {
+            Button(model.strings.send, systemImage: "arrow.up") {
                 model.sendMessage()
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(canSend ? theme.onAccentText : theme.textMuted)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(canSend ? theme.accent : theme.divider))
             }
+            .labelStyle(.iconOnly)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(canSend ? theme.onAccentText : theme.textMuted)
+            .frame(width: 32, height: 32)
+            .background(Circle().fill(canSend ? theme.accent : theme.divider))
+            // Keeps the visible circle at its designed 32x32 size while
+            // still meeting Apple's 44x44 minimum tap target — contentShape
+            // must come after the enlarging frame, or it freezes the hit
+            // area at the pre-enlargement 32x32 size.
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             .disabled(!canSend)
         }

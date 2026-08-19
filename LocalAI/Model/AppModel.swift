@@ -130,9 +130,7 @@ final class AppModel: ObservableObject {
         let initialModelLoad = loadModels()
         Task {
             _ = await initialModelLoad.value
-            await MainActor.run {
-                self.detectInterruptedGeneration()
-            }
+            detectInterruptedGeneration()
         }
     }
 

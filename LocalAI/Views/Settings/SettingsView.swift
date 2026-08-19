@@ -24,16 +24,17 @@ struct SettingsView: View {
                             model.openModelPicker(from: .settings)
                         } content: {
                             Text(model.model ?? model.strings.noModelSelected)
-                                .foregroundColor(theme.text)
+                                .foregroundStyle(theme.text)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .foregroundColor(theme.textMuted)
+                                .foregroundStyle(theme.textMuted)
+                                .accessibilityHidden(true)
                         }
 
                         if model.isRetryingModels {
                             Text(model.strings.retryingAutomatically)
                                 .font(AppFont.body(12))
-                                .foregroundColor(theme.textMuted)
+                                .foregroundStyle(theme.textMuted)
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 13)
                         }
@@ -43,7 +44,7 @@ struct SettingsView: View {
                     GroupCard(theme: theme) {
                         TextField(model.backend.defaultServerAddress, text: serverAddressBinding)
                             .font(AppFont.body(14.5))
-                            .foregroundColor(theme.text)
+                            .foregroundStyle(theme.text)
                             .autocorrectionDisabled()
                             #if os(iOS)
                             .textInputAutocapitalization(.never)
@@ -54,7 +55,7 @@ struct SettingsView: View {
 
                         Text(model.backend.remoteAccessHint(model.language))
                             .font(AppFont.body(12))
-                            .foregroundColor(theme.textMuted)
+                            .foregroundStyle(theme.textMuted)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 13)
                     }
@@ -94,20 +95,21 @@ struct SettingsView: View {
 
                     SectionLabel(model.strings.sectionAbout, theme: theme)
                     GroupCard(theme: theme) {
-                        ForEach(Array(LegalKey.allCases.enumerated()), id: \.element) { index, key in
+                        ForEach(Array(LegalKey.allCases.enumerated()), id: \.element.id) { index, key in
                             GroupRow(theme: theme, isFirst: index == 0) {
                                 model.openLegal(key)
                             } content: {
                                 Text(legalLabel(key))
-                                    .foregroundColor(theme.text)
+                                    .foregroundStyle(theme.text)
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .foregroundColor(theme.textMuted)
+                                    .foregroundStyle(theme.textMuted)
+                                    .accessibilityHidden(true)
                             }
                         }
                         Text(model.strings.version)
                             .font(AppFont.body(12))
-                            .foregroundColor(theme.textMuted)
+                            .foregroundStyle(theme.textMuted)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,7 +121,7 @@ struct SettingsView: View {
                             model.showResetToDefaultConfirmation = true
                         } content: {
                             Text(model.strings.resetToDefault)
-                                .foregroundColor(.red)
+                                .foregroundStyle(.red)
                         }
                     }
                     .padding(.top, 18)
@@ -196,7 +198,7 @@ struct SectionLabel: View {
         Text(text.uppercased())
             .font(AppFont.body(11, weight: .bold))
             .tracking(0.5)
-            .foregroundColor(theme.textMuted)
+            .foregroundStyle(theme.textMuted)
             .padding(.top, 18)
             .padding(.bottom, 8)
             .padding(.horizontal, 2)

@@ -8,7 +8,7 @@ struct WelcomeStepView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("AI")
                 .font(AppFont.heading(22))
-                .foregroundColor(theme.onAccentText)
+                .foregroundStyle(theme.onAccentText)
                 .frame(width: 64, height: 64)
                 .background(Circle().fill(theme.accent))
                 .padding(.top, 28)
@@ -16,12 +16,12 @@ struct WelcomeStepView: View {
 
             Text(model.strings.welcomeTitle)
                 .font(AppFont.heading(34))
-                .foregroundColor(theme.text)
+                .foregroundStyle(theme.text)
                 .padding(.bottom, 14)
 
             Text(model.strings.welcomeBody)
                 .font(AppFont.body(16))
-                .foregroundColor(theme.textMuted)
+                .foregroundStyle(theme.textMuted)
                 .lineSpacing(4)
                 .frame(maxWidth: 300, alignment: .leading)
 
