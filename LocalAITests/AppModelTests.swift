@@ -427,6 +427,68 @@ struct AppModelChatTests {
         #expect(greetings.first?.backend == .ollama)
     }
 
+    @Test func aModelThatResolvesAfterReturningToChatStillUpdatesTheGreeting() async {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m2"]), persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+
+        // Same setup as the no-op-while-nil test above: goChat() runs
+        // before the Backend switch's async Model fetch resolves (e.g. a
+        // slower network, a remote Backend over Tailscale), so it skips
+        // reconciling.
+        model.selectBackend(.lmstudio)
+        model.goChat()
+        #expect(model.chats[chatId]?.messages.filter { $0.isGreeting }.count == 1)
+
+        // Once the fetch actually resolves — even though the user has
+        // already left goChat() behind — the Greeting must still catch up,
+        // not stay stale until some later, unrelated goChat() call.
+        try? await Task.sleep(nanoseconds: 20_000_000)
+
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 2)
+        #expect(greetings.last?.backend == .lmstudio)
+        #expect(greetings.last?.model == "m2")
+    }
+
+    @Test func aModelThatResolvesWhileStillInSettingsDoesNotReconcileUntilGoChat() async {
+        let store = FakePersistenceStore()
+        let model = makeTestAppModel(modelCatalogClient: FakeModelCatalogClient(models: ["m2"]), persistenceStore: store)
+        model.selectModel("m1")
+        model.newChat()
+        let chatId = model.currentChatId!
+        model.chats[chatId]?.messages.append(ChatMessage(id: "u1", role: .user, text: "hi"))
+        model.persistChat(chatId)
+        model.goSettings()
+
+        // Flips Backend twice, letting each fetch fully resolve, without
+        // ever calling goChat() in between — reconciliation must not fire
+        // just because a fetch resolved while still on Settings, or this
+        // would accumulate Greetings for switches the user never actually
+        // confirmed by returning to Chat.
+        model.selectBackend(.lmstudio)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        model.selectBackend(.ollama)
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        #expect(model.chats[chatId]?.messages.filter { $0.isGreeting }.count == 1)
+
+        model.goChat()
+
+        // Only now — on the actual return to Chat — does the final state
+        // (back to Ollama, same as the original Greeting's Backend, but a
+        // different Model — "m2" was auto-selected on both switches) get
+        // reconciled, exactly once: one new Greeting, not one per
+        // mid-Settings switch.
+        let greetings = model.chats[chatId]?.messages.filter { $0.isGreeting } ?? []
+        #expect(greetings.count == 2)
+        #expect(greetings.last?.backend == .ollama)
+        #expect(greetings.last?.model == "m2")
+    }
+
     @Test func repeatedlySwitchingBackendModelOnAStillEmptyChatNeverAccumulatesGreetings() {
         let store = FakePersistenceStore()
         let model = makeTestAppModel(persistenceStore: store)

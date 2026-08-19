@@ -59,6 +59,24 @@ extension AppModel {
                     }
                     self.modelPendingValidation = nil
                     self.persistSettings()
+                    // Catches up a Greeting comparison that `goChat()` had
+                    // to skip because `model` was still nil at the time
+                    // (see `reconcileGreetingForCurrentChat()`'s own nil
+                    // guard) — without this, a fetch that resolves after
+                    // the user has already returned to Chat (slower
+                    // networks, e.g. a remote Backend over Tailscale) would
+                    // otherwise never get a chance to update the Greeting.
+                    // Gated on `screen == .chat`: reconciliation is only
+                    // ever meant to happen on return to Chat, not while
+                    // still browsing Settings/Model Picker — a fetch that
+                    // resolves *before* the user has returned (the common
+                    // case on a fast/local network) must wait for `goChat()`
+                    // the same as always, so flipping Backend/Model back and
+                    // forth before returning still doesn't accumulate
+                    // Greetings the user never actually confirmed.
+                    if self.screen == .chat {
+                        self.reconcileGreetingForCurrentChat()
+                    }
                 }
             }
             return resolvedState
@@ -116,10 +134,33 @@ extension AppModel {
     /// fetch it's currently mid-flight on. These are cancelled separately
     /// because they're independent unstructured tasks — cancelling the loop
     /// does not, by itself, cancel the fetch it most recently kicked off.
+    /// Only cancels `modelLoadTask` when a loop was actually running: a bare
+    /// `loadModels()` fetch that isn't part of one (e.g. kicked off by a
+    /// Backend/Model switch in Settings) is left to resolve normally even
+    /// after this is called from `goChat()` — otherwise returning to Chat
+    /// quickly after a switch would silently abandon that fetch, and
+    /// `model` would never actually get set (see `reconcileGreetingForCurrentChat()`,
+    /// which relies on this fetch eventually resolving to catch up the
+    /// current Chat's Greeting). Use `stopAllModelWork()` where abandoning
+    /// a bare fetch too is actually required.
     func stopModelRetryLoop() {
+        let wasRetrying = modelRetryLoopTask != nil
         modelRetryLoopTask?.cancel()
         modelRetryLoopTask = nil
         isRetryingModels = false
+        if wasRetrying {
+            modelLoadTask?.cancel()
+        }
+    }
+
+    /// Cancels every in-flight Model-list activity unconditionally — the
+    /// retry loop (if any) and a bare, non-retry-loop `loadModels()` fetch
+    /// alike. `goChat()` deliberately uses `stopModelRetryLoop()` instead
+    /// (see its doc comment); `resetToDefault()` needs this stronger
+    /// guarantee, since a stale fetch resolving after a reset could
+    /// silently re-persist a non-default Model.
+    func stopAllModelWork() {
+        stopModelRetryLoop()
         modelLoadTask?.cancel()
     }
 
