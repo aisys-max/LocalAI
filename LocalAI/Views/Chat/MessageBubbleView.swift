@@ -28,7 +28,7 @@ struct MessageBubbleView: View {
                     Text(modelBackendLabel.uppercased())
                         .font(AppFont.body(10.5, weight: .bold))
                         .tracking(0.3)
-                        .foregroundColor(theme.accent2)
+                        .foregroundStyle(theme.accent2)
                 }
                 .buttonStyle(.plain)
             }
@@ -38,14 +38,14 @@ struct MessageBubbleView: View {
                 case .code(_, let text):
                     Text(text)
                         .font(.system(size: 12.5, design: .monospaced))
-                        .foregroundColor(Palette.Neutral.n100)
+                        .foregroundStyle(Palette.Neutral.n100)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(RoundedRectangle(cornerRadius: 12).fill(Palette.Neutral.n900))
                 case .text(_, let parts):
                     inlineText(parts)
                         .font(AppFont.body(14.5))
-                        .foregroundColor(isUser ? theme.onAccentText : theme.text)
+                        .foregroundStyle(isUser ? theme.onAccentText : theme.text)
                 }
             }
 
@@ -54,10 +54,7 @@ struct MessageBubbleView: View {
                     Button {
                         model.copyMessage(id: message.id, text: message.text)
                     } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "doc.on.doc")
-                            Text(model.copiedId == message.id ? model.strings.copied : model.strings.copy)
-                        }
+                        Label(model.copiedId == message.id ? model.strings.copied : model.strings.copy, systemImage: "doc.on.doc")
                     }
                     .buttonStyle(.plain)
 
@@ -66,15 +63,12 @@ struct MessageBubbleView: View {
                             model.regenerate(chatId: chatId, messageId: message.id)
                         }
                     } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text(model.strings.regenerate)
-                        }
+                        Label(model.strings.regenerate, systemImage: "arrow.triangle.2.circlepath")
                     }
                     .buttonStyle(.plain)
                 }
                 .font(AppFont.body(11.5))
-                .foregroundColor(theme.textMuted)
+                .foregroundStyle(theme.textMuted)
                 .padding(.top, 4)
             }
         }
@@ -87,7 +81,8 @@ struct MessageBubbleView: View {
 
     private func inlineText(_ parts: [InlinePart]) -> Text {
         parts.reduce(Text("")) { acc, part in
-            acc + (part.bold ? Text(part.text).fontWeight(.bold) : Text(part.text))
+            let piece = part.bold ? Text(part.text).fontWeight(.bold) : Text(part.text)
+            return Text("\(acc)\(piece)")
         }
     }
 }

@@ -223,28 +223,22 @@ extension AppModel {
             var started = false
             do {
                 for try await chunk in backendClient.generateReply(chatId: chatId, model: model, messages: messages, baseURL: currentServerURL, delayNanoseconds: delayNanoseconds) {
-                    await MainActor.run {
-                        if started {
-                            self.appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
-                        } else {
-                            self.beginReply(chatId: chatId, messageId: assistantId, chunk: chunk)
-                            started = true
-                        }
+                    if started {
+                        appendReplyChunk(chatId: chatId, messageId: assistantId, chunk: chunk)
+                    } else {
+                        beginReply(chatId: chatId, messageId: assistantId, chunk: chunk)
+                        started = true
                     }
                 }
             } catch {
-                await MainActor.run {
-                    self.appendFailureMessage(chatId: chatId, error: error)
-                }
+                appendFailureMessage(chatId: chatId, error: error)
             }
             // One save for the whole Generation, here at the end — not per
             // chunk (`appendReplyChunk`/`beginReply` don't persist), so an
             // app kill mid-stream never leaves a partial assistant Message
             // on disk.
-            await MainActor.run {
-                self.generating = false
-                self.persistChat(chatId)
-            }
+            generating = false
+            persistChat(chatId)
         }
     }
 
@@ -283,10 +277,8 @@ extension AppModel {
         copiedId = id
         copyResetTask?.cancel()
         copyResetTask = Task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await MainActor.run {
-                if self.copiedId == id { self.copiedId = nil }
-            }
+            try? await Task.sleep(for: .seconds(1.5))
+            if copiedId == id { copiedId = nil }
         }
     }
 

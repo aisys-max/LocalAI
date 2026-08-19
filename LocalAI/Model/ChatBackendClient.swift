@@ -12,7 +12,7 @@ struct SimulatedChatBackendClient: ChatBackendClient {
     func generateReply(chatId: String, model: String, messages: [ChatMessage], baseURL: URL, delayNanoseconds: UInt64) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
+                try? await Task.sleep(for: .nanoseconds(Int64(delayNanoseconds)))
                 continuation.yield(CannedReplies.random())
                 continuation.finish()
             }

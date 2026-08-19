@@ -29,7 +29,7 @@ struct ModelListContent: View {
             if models.isEmpty {
                 Text(strings.noModelsFound)
                     .font(AppFont.body(13.5))
-                    .foregroundColor(theme.textMuted)
+                    .foregroundStyle(theme.textMuted)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
@@ -49,18 +49,18 @@ struct ModelListContent: View {
         VStack(spacing: 12) {
             Text(message)
                 .font(AppFont.body(13.5))
-                .foregroundColor(theme.textMuted)
+                .foregroundStyle(theme.textMuted)
                 .multilineTextAlignment(.center)
             if let hint {
                 Text(hint)
                     .font(AppFont.body(12))
-                    .foregroundColor(theme.textMuted)
+                    .foregroundStyle(theme.textMuted)
                     .multilineTextAlignment(.center)
             }
             Button(action: onRetry) {
                 Text(strings.retry)
                     .font(AppFont.body(14, weight: .semibold))
-                    .foregroundColor(theme.accent)
+                    .foregroundStyle(theme.accent)
             }
             .buttonStyle(.plain)
         }
@@ -76,28 +76,30 @@ struct ModelRow: View {
     let action: () -> Void
 
     var body: some View {
-        HStack {
-            Text(name)
-                .font(AppFont.body(14.5))
-                .foregroundColor(selected ? theme.selectedText : theme.text)
-            Spacer()
-            if selected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(theme.selectedText)
+        Button(action: action) {
+            HStack {
+                Text(name)
+                    .font(AppFont.body(14.5))
+                    .foregroundStyle(selected ? theme.selectedText : theme.text)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(theme.selectedText)
+                }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(selected ? theme.selectedTint : theme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(selected ? theme.accent : theme.divider, lineWidth: 1.5)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(selected ? theme.selectedTint : theme.surface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(selected ? theme.accent : theme.divider, lineWidth: 1.5)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture(perform: action)
+        .buttonStyle(.plain)
     }
 }

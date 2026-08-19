@@ -96,6 +96,7 @@ struct Strings {
     let resetToDefaultConfirmTitle: String
     let resetToDefaultConfirmMessage: String
     let reset: String
+    let send: String
 
     static let en = Strings(
         appName: "Local AI", newChat: "New chat", settingsTitle: "Settings",
@@ -147,7 +148,8 @@ struct Strings {
         resetToDefault: "Reset to Default",
         resetToDefaultConfirmTitle: "Reset to default?",
         resetToDefaultConfirmMessage: "This deletes every conversation and resets all Settings to their defaults. This can't be undone.",
-        reset: "Reset"
+        reset: "Reset",
+        send: "Send"
     )
 
     static let ko = Strings(
@@ -200,7 +202,8 @@ struct Strings {
         resetToDefault: "기본값으로 재설정",
         resetToDefaultConfirmTitle: "기본값으로 재설정할까요?",
         resetToDefaultConfirmMessage: "모든 대화가 삭제되고 모든 설정이 기본값으로 초기화됩니다. 되돌릴 수 없습니다.",
-        reset: "재설정"
+        reset: "재설정",
+        send: "보내기"
     )
 
     func replyFailureMessage(for kind: ChatReplyFailureKind) -> String {
