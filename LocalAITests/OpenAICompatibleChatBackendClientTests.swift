@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import LocalAI
 
+@Suite(.tags(.networking))
 struct OpenAICompatibleChatBackendClientTests {
     private let testBaseURL = URL(string: "http://localhost:11434")!
 
@@ -54,7 +55,7 @@ struct OpenAICompatibleChatBackendClientTests {
         StubURLProtocol.stub(status: 500, body: Data())
         let client = OpenAICompatibleChatBackendClient(session: stubbedSession())
 
-        await #expect(throws: Error.self) {
+        await #expect(throws: OpenAICompatibleChatBackendClientError.badResponse(statusCode: 500)) {
             for try await _ in client.generateReply(chatId: "c1", model: "llama3", messages: [], baseURL: testBaseURL, delayNanoseconds: 0) {}
         }
     }

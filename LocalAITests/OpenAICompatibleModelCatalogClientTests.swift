@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import LocalAI
 
+@Suite(.tags(.networking))
 struct OpenAICompatibleModelCatalogClientTests {
     private let testBaseURL = URL(string: "http://localhost:11434")!
 
@@ -38,7 +39,7 @@ struct OpenAICompatibleModelCatalogClientTests {
         StubURLProtocol.stub(status: 500, body: Data())
         let client = OpenAICompatibleModelCatalogClient(session: stubbedSession())
 
-        await #expect(throws: Error.self) {
+        await #expect(throws: ModelCatalogClientError.badResponse) {
             _ = try await client.fetchModels(baseURL: testBaseURL)
         }
     }
@@ -47,7 +48,7 @@ struct OpenAICompatibleModelCatalogClientTests {
         StubURLProtocol.stub(status: 200, body: "not json".data(using: .utf8)!)
         let client = OpenAICompatibleModelCatalogClient(session: stubbedSession())
 
-        await #expect(throws: Error.self) {
+        await #expect(throws: DecodingError.self) {
             _ = try await client.fetchModels(baseURL: testBaseURL)
         }
     }

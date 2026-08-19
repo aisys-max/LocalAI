@@ -24,7 +24,7 @@ struct OpenAICompatibleModelCatalogClient: ModelCatalogClient {
     }
 }
 
-enum ModelCatalogClientError: Error {
+enum ModelCatalogClientError: Error, Equatable {
     case badResponse
 }
 
