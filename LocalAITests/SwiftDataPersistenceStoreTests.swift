@@ -275,4 +275,28 @@ struct SwiftDataPersistenceStoreTests {
         #expect(store.loadDraft() == "unsent")
         #expect(store.loadSettings().backend == .lmstudio)
     }
+
+    // MARK: - LocalAISchemaV1 / LocalAIMigrationPlan
+
+    /// `makeInMemoryContainer()` above (and every other test in this file)
+    /// builds its container from a bare `Schema([...])` literal, not from
+    /// `LocalAISchemaV1`/`LocalAIMigrationPlan` — so none of those tests
+    /// would catch `LocalAISchemaV1.models` drifting from the actual
+    /// `@Model` types, or the migration plan failing to open a container at
+    /// all. This test goes through the real versioned schema and migration
+    /// plan instead, confirming they still produce a working, read/write
+    /// SwiftData store.
+    @Test func localAISchemaV1AndItsMigrationPlanProduceAWorkingStore() {
+        let schema = Schema(versionedSchema: LocalAISchemaV1.self)
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: schema, migrationPlan: LocalAIMigrationPlan.self, configurations: configuration)
+
+        let store = SwiftDataPersistenceStore(container: container)
+        let chat = Chat(id: "c1", createdAt: Date(), title: "Chat", snippet: "hi", messages: [
+            ChatMessage(id: "m1", role: .assistant, text: "hi", isGreeting: true)
+        ])
+        store.saveChat(chat)
+
+        #expect(store.loadChats()["c1"]?.messages.first?.text == "hi")
+    }
 }
